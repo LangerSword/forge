@@ -1,5 +1,53 @@
 {
-  "dependencies": {
-    "neatlogs": "^1.1.19"
-  }
+  "name": "forge-evidence-site",
+  "version": "0.1.0",
+  "description": "A static, evidence-backed Forge control-plane snapshot.",
+  "type": "commonjs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LangerSword/forge.git",
+    "directory": "web"
+  },
+  "homepage": "https://web-rust-three-63.vercel.app/",
+  "bugs": {
+    "url": "https://github.com/LangerSword/forge/issues"
+  },
+  "files": [
+    "bin",
+    "public",
+    "web/server.js",
+    "scripts",
+    "README.md",
+    "web/README.md"
+  ],
+  "bin": {
+    "forge-evidence-site": "bin/forge-evidence-site.js"
+  },
+  "scripts": {
+    "build": "node scripts/build-web.js",
+    "start": "node bin/forge-evidence-site.js",
+    "serve": "node bin/forge-evidence-site.js",
+    "preview": "npm run build && node bin/forge-evidence-site.js --port 4173",
+    "prepack": "npm run build",
+    "prepare": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "forge",
+    "agent-fleets",
+    "evidence",
+    "observability",
+    "static-site",
+    "deployment"
+  ],
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "devDependencies": {},
+  "author": ""
 }

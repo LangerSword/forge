@@ -124,6 +124,19 @@ workflow. Android/APK and store deployment are later adapters, not part of the
 core Track 1 learning claim.
 No generated app deploys automatically without an approval event.
 
+### Install the evidence site from GitHub
+
+The npm registry name `forge` is already owned by an unrelated package. The
+Forge evidence site is therefore installable directly from this repository:
+
+```bash
+npm install github:LangerSword/forge
+npx forge-evidence-site --port 4173
+```
+
+The package builds its static assets during installation and serves the
+read-only evidence snapshot. It does not connect to a live Forge backend.
+
 Full runbook: `SPEC.md` §10 and §15. AO must be running (`ao status`); Forge drives
 it over the loopback API recorded in `.forge/ao-surface.json`.
 

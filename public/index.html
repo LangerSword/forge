@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Forge evidence control plane — a static, evidence-backed model of one bounded learning loop.">
+  <title>Forge / Evidence Control Plane</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="site-shell">
+    <aside class="sidebar" aria-label="Forge navigation">
+      <div>
+        <a class="brand" href="#overview" aria-label="Forge overview">
+          <span class="brand-mark" aria-hidden="true"><i></i><b></b></span>
+          <span>
+            <strong>FORGE</strong>
+            <small>evidence control plane</small>
+          </span>
+        </a>
+
+        <div class="sidebar-rule" aria-hidden="true"></div>
+
+        <p class="nav-label">Snapshot</p>
+        <nav class="nav-list">
+          <a class="nav-link is-active" href="#overview"><span class="nav-index">01</span>Overview</a>
+          <a class="nav-link" href="#run-anatomy"><span class="nav-index">02</span>Run anatomy</a>
+          <a class="nav-link" href="#ledger"><span class="nav-index">03</span>Evidence ledger</a>
+          <a class="nav-link" href="#open-edges"><span class="nav-index">04</span>Open edges</a>
+          <a class="nav-link" href="#deployment"><span class="nav-index">05</span>Package</a>
+        </nav>
+      </div>
+
+      <div class="sidebar-foot">
+        <div class="side-status"><span class="status-dot is-green" aria-hidden="true"></span><span>npm package ready</span></div>
+        <code>forge-evidence-site@0.1.0</code>
+        <p>static dist deploy<br>no live runtime connection</p>
+      </div>
+    </aside>
+
+    <main class="main-content" id="overview">
+      <header class="topbar">
+        <div class="breadcrumbs"><span>FORGE</span><span class="slash">/</span><span>evidence snapshot</span></div>
+        <div class="topbar-meta"><span class="meta-chip">NPM READY</span><span>06 SEP 2026</span></div>
+      </header>
+
+      <section class="hero" aria-labelledby="page-title">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span>Submission evidence / bounded learning loop</div>
+          <h1 id="page-title">What the fleet <em>proved.</em><br>What it still owes.</h1>
+          <p class="hero-lede">A quiet control-plane view of one C0 run: red baseline, bounded repair, model reflection, and a trace that can be read back. Every status below is tied to observed project evidence or marked as an open edge.</p>
+          <div class="run-ident">
+            <span class="run-label">RUN ID</span>
+            <code>submission-c0-82dffafc</code>
+            <span class="run-separator" aria-hidden="true"></span>
+            <span>local evidence model</span>
+          </div>
+        </div>
+        <div class="truth-panel">
+          <div class="truth-kicker"><span class="status-dot is-amber" aria-hidden="true"></span>Evidence boundary</div>
+          <h2>Read the labels.</h2>
+          <p>Observed means a command, artifact, or readback backs the claim. Candidate means reflection exists but promotion has not happened. Unverified edges stay visible.</p>
+          <div class="truth-foot"><span class="mini-key is-observed"></span>observed <span class="mini-key is-candidate"></span>candidate <span class="mini-key is-open"></span>unverified</div>
+        </div>
+      </section>
+
+      <div class="filter-bar" aria-label="Filter evidence cards">
+        <span class="filter-label">VIEW</span>
+        <div class="filter-group" role="group" aria-label="Evidence filters">
+          <button class="filter-button is-selected" type="button" data-filter="all" aria-pressed="true">All evidence</button>
+          <button class="filter-button" type="button" data-filter="observed" aria-pressed="false">Observed</button>
+          <button class="filter-button" type="button" data-filter="candidate" aria-pressed="false">Candidate</button>
+          <button class="filter-button" type="button" data-filter="unverified" aria-pressed="false">Unverified</button>
+        </div>
+        <span class="filter-note" id="filter-note">5 evidence cards</span>
+      </div>
+
+      <section class="section-heading" id="run-anatomy">
+        <div>
+          <p class="section-index">01 / evidence map</p>
+          <h2>Run anatomy</h2>
+        </div>
+        <p>One bounded task, five surfaces, no implied runtime beyond the record.</p>
+      </section>
+
+      <section class="signal-strip" aria-label="Observed signal summary">
+        <div class="signal-cell">
+          <span class="signal-value">49</span>
+          <span class="signal-label">full-suite tests</span>
+          <span class="signal-source">uv run pytest -q</span>
+        </div>
+        <div class="signal-cell">
+          <span class="signal-value">7</span>
+          <span class="signal-label">spans read back</span>
+          <span class="signal-source">Neatlogs verify / exit 0</span>
+        </div>
+        <div class="signal-cell">
+          <span class="signal-value">1</span>
+          <span class="signal-label">bounded repair attempt</span>
+          <span class="signal-source">submission-mvp / observed</span>
+        </div>
+        <div class="signal-cell signal-cell--text">
+          <span class="signal-value">C0</span>
+          <span class="signal-label">candidate skill scope</span>
+          <span class="signal-source">not promoted / not transferable</span>
+        </div>
+      </section>
+
+      <div class="evidence-grid">
+        <article class="evidence-card card-ao" data-tags="observed unverified" data-card-name="AO execution plane">
+          <header class="card-header">
+            <div class="card-label"><span class="card-index">A</span><span>Execution boundary</span></div>
+            <span class="status-badge status-badge--open"><span class="status-dot is-amber" aria-hidden="true"></span>mixed evidence</span>
+          </header>
+          <div class="card-body">
+            <h3>AO execution plane</h3>
+            <p class="card-intro">The supervisor is real and healthy. The final worker launch and completion lifecycle are deliberately not presented as proven.</p>
+            <div class="fact-list">
+              <div class="fact-row"><span class="fact-key">daemon</span><strong>healthz ok · readyz ready</strong><span class="fact-state fact-state--observed">observed</span></div>
+              <div class="fact-row"><span class="fact-key">authorized worker</span><strong>OpenCode only</strong><span class="fact-state fact-state--observed">observed</span></div>
+              <div class="fact-row"><span class="fact-key">spawn contract</span><strong>blocked_unknown_payload</strong><span class="fact-state fact-state--open">open</span></div>
+              <div class="fact-row"><span class="fact-key">final lifecycle</span><strong>not verified for this run</strong><span class="fact-state fact-state--open">open</span></div>
+            </div>
+          </div>
+          <footer class="card-footer">
+            <code>.forge/ao-surface.json</code>
+            <button class="text-button" type="button" data-inspect="ao">Inspect boundary <span aria-hidden="true">↗</span></button>
+          </footer>
+        </article>
+
+        <article class="evidence-card card-runner" data-tags="candidate unverified" data-card-name="AO Runner contract">
+          <header class="card-header">
+            <div class="card-label"><span class="card-index">F</span><span>Runner contract</span></div>
+            <span class="status-badge status-badge--candidate"><span class="status-dot is-yellow" aria-hidden="true"></span>implemented</span>
+          </header>
+          <div class="card-body">
+            <h3>Bounded AO Runner</h3>
+            <p class="card-intro">Forge now owns a documented spawn → poll → artifact → verify loop, with one nudge and a watchdog kill instead of trusting <code>working</code> status.</p>
+            <div class="fact-list">
+              <div class="fact-row"><span class="fact-key">spawn</span><strong>AO CLI flags</strong><span class="fact-state fact-state--observed">contracted</span></div>
+              <div class="fact-row"><span class="fact-key">poll</span><strong>session state + worktree</strong><span class="fact-state fact-state--observed">contracted</span></div>
+              <div class="fact-row"><span class="fact-key">recovery</span><strong>one nudge → kill</strong><span class="fact-state fact-state--candidate">bounded</span></div>
+              <div class="fact-row"><span class="fact-key">pass gate</span><strong>artifact + verifier</strong><span class="fact-state fact-state--open">not live-proven</span></div>
+            </div>
+          </div>
+          <footer class="card-footer">
+            <code>forge.ao-runner.v1</code>
+            <button class="text-button" type="button" data-inspect="runner">Inspect contract <span aria-hidden="true">↗</span></button>
+          </footer>
+        </article>
+
+        <article class="evidence-card card-c0" data-tags="observed" data-card-name="C0 baseline and repair">
+          <header class="card-header">
+            <div class="card-label"><span class="card-index">B</span><span>Outcome evidence</span></div>
+            <span class="status-badge status-badge--observed"><span class="status-dot is-green" aria-hidden="true"></span>observed</span>
+          </header>
+          <div class="card-body">
+            <h3>Red baseline <span class="arrow">→</span> green result</h3>
+            <p class="card-intro">The verifier saw a failing frozen candidate, one bounded repair, and a passing re-check. The full regression suite later reported 61 passing tests.</p>
+            <div class="run-track" aria-label="C0 run progression">
+              <div class="track-step track-step--fail">
+                <span class="track-node">01</span>
+                <span class="track-title">baseline</span>
+                <strong>EXIT 1</strong>
+                <small>test_failure</small>
+              </div>
+              <div class="track-connector" aria-hidden="true"></div>
+              <div class="track-step track-step--repair">
+                <span class="track-node">02</span>
+                <span class="track-title">repair</span>
+                <strong>1 attempt</strong>
+                <small>bounded loop</small>
+              </div>
+              <div class="track-connector" aria-hidden="true"></div>
+              <div class="track-step track-step--pass">
+                <span class="track-node">03</span>
+                <span class="track-title">final</span>
+                <strong>EXIT 0</strong>
+                <small>4 frozen tests</small>
+              </div>
+            </div>
+          </div>
+          <footer class="card-footer">
+            <code>status=passed · events=5</code>
+            <button class="text-button" type="button" data-inspect="c0">Inspect run <span aria-hidden="true">↗</span></button>
+          </footer>
+        </article>
+
+        <article class="evidence-card card-skill" data-tags="observed candidate" data-card-name="Candidate skill">
+          <header class="card-header">
+            <div class="card-label"><span class="card-index">C</span><span>Learning artifact</span></div>
+            <span class="status-badge status-badge--candidate"><span class="status-dot is-yellow" aria-hidden="true"></span>candidate</span>
+          </header>
+          <div class="card-body">
+            <h3>Reflection became a candidate skill</h3>
+            <p class="card-intro">GPT-5 Nano returned a strict structured reflection for the observed C0 failure. Forge stored the result as a bounded candidate, not a promoted capability.</p>
+            <div class="skill-panel">
+              <div class="skill-title"><span class="skill-glyph" aria-hidden="true">ƒ</span><code>c0-name-normalizer-v1</code></div>
+              <dl class="skill-facts">
+                <div><dt>model</dt><dd>gpt-5-nano</dd></div>
+                <div><dt>scope</dt><dd>C0 task family only</dd></div>
+                <div><dt>gate</dt><dd class="is-yellow-text">not run / candidate</dd></div>
+              </dl>
+            </div>
+          </div>
+          <footer class="card-footer">
+            <code>reflection_error=null</code>
+            <button class="text-button" type="button" data-inspect="skill">Inspect artifact <span aria-hidden="true">↗</span></button>
+          </footer>
+        </article>
+
+        <article class="evidence-card card-trace" data-tags="observed" data-card-name="Neatlogs trace">
+          <header class="card-header">
+            <div class="card-label"><span class="card-index">D</span><span>Observability readback</span></div>
+            <span class="status-badge status-badge--observed"><span class="status-dot is-green" aria-hidden="true"></span>read back</span>
+          </header>
+          <div class="card-body">
+            <h3>Trace readback, not just instrumentation</h3>
+            <p class="card-intro">The real submission workflow was finalized in Neatlogs and read back with the required application input/output fields present.</p>
+            <div class="trace-visual" aria-label="Seven persisted Neatlogs spans">
+              <div class="trace-topline"><span>TRACE</span><code>6f969ec0305657630aeb0b959cc189ab</code></div>
+              <div class="trace-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="trace-bottomline"><strong>7 persisted spans</strong><span>required input / output present</span></div>
+            </div>
+          </div>
+          <footer class="card-footer">
+            <code>neatlogs verify · exit 0</code>
+            <button class="text-button" type="button" data-inspect="trace">Inspect readback <span aria-hidden="true">↗</span></button>
+          </footer>
+        </article>
+
+        <article class="evidence-card card-blockers" id="open-edges" data-tags="unverified" data-card-name="Open edges and blockers">
+          <header class="card-header">
+            <div class="card-label"><span class="card-index">E</span><span>Honest boundary</span></div>
+            <span class="status-badge status-badge--open"><span class="status-dot is-amber" aria-hidden="true"></span>unverified</span>
+          </header>
+          <div class="card-body blockers-body">
+            <div>
+              <h3>Open edges stay on the page</h3>
+              <p class="card-intro">These are not failures hidden below the fold. They are the next checks required before a broader fleet claim.</p>
+            </div>
+            <div class="blocker-list">
+              <div class="blocker-row"><span class="blocker-marker">01</span><div><strong>AO spawn + lifecycle</strong><p>Raw session creation semantics and final-run completion are not verified. Health is not completion proof.</p></div><span class="blocker-state">open</span></div>
+              <div class="blocker-row"><span class="blocker-marker">02</span><div><strong>Cross-harness transfer</strong><p>No observed second-harness result is shown here; the candidate remains scoped to C0.</p></div><span class="blocker-state">open</span></div>
+              <div class="blocker-row"><span class="blocker-marker">03</span><div><strong>Supermemory mirror</strong><p>Setup remains TODO. The local skill registry is the current evidence surface.</p></div><span class="blocker-state">future</span></div>
+            </div>
+          </div>
+          <footer class="card-footer">
+            <code>no claim without an observed run</code>
+            <button class="text-button" type="button" data-inspect="blockers">Inspect gaps <span aria-hidden="true">↗</span></button>
+          </footer>
+        </article>
+      </div>
+
+      <section class="ledger-section" id="ledger" aria-labelledby="ledger-title">
+        <div class="section-heading section-heading--ledger">
+          <div>
+            <p class="section-index">02 / provenance</p>
+            <h2 id="ledger-title">Evidence ledger</h2>
+          </div>
+          <p>Short references for the claims above. Paths are source labels, not live links.</p>
+        </div>
+        <div class="ledger-table-wrap">
+          <table class="ledger-table">
+            <thead><tr><th>Signal</th><th>Observed result</th><th>Source</th><th>State</th></tr></thead>
+            <tbody>
+              <tr><td>Regression suite</td><td><strong>61 passed</strong></td><td><code>uv run pytest -q</code></td><td><span class="table-state table-state--observed">observed</span></td></tr>
+              <tr><td>C0 verifier</td><td>baseline exit 1 → final exit 0</td><td><code>evals/results/submission-c0-82dffafc.json</code></td><td><span class="table-state table-state--observed">observed</span></td></tr>
+              <tr><td>Reflection</td><td><code>gpt-5-nano</code> · candidate skill</td><td><code>submission-mvp --reflect</code></td><td><span class="table-state table-state--candidate">candidate</span></td></tr>
+              <tr><td>Trace readback</td><td><strong>7 spans</strong> · verify exit 0</td><td><code>6f969ec0305657630aeb0b959cc189ab</code></td><td><span class="table-state table-state--observed">observed</span></td></tr>
+              <tr><td>Harness gate</td><td>0 of 2 ready for transfer</td><td><code>forge harnesses</code></td><td><span class="table-state table-state--open">open</span></td></tr>
+              <tr><td>AO spawn</td><td>payload / lifecycle not verified</td><td><code>.forge/ao-surface.json</code></td><td><span class="table-state table-state--open">unverified</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="deployment-section" id="deployment" aria-labelledby="deployment-title">
+        <div class="section-heading section-heading--deployment">
+          <div>
+            <p class="section-index">03 / delivery package</p>
+            <h2 id="deployment-title">Ship the snapshot</h2>
+          </div>
+          <p>One npm package, one generated output directory, and a clear boundary between static evidence and live Forge runtime.</p>
+        </div>
+        <div class="deployment-grid">
+          <article class="deployment-card">
+            <header class="deployment-card-header">
+              <div>
+                <p class="deployment-kicker">npm package</p>
+                <h3>forge-evidence-site@0.1.0</h3>
+              </div>
+              <span class="status-badge status-badge--observed"><span class="status-dot is-green" aria-hidden="true"></span>package ready</span>
+            </header>
+            <p class="deployment-intro">Dependency-free packaging for the evidence control plane. The build validates the browser entrypoint and copies the deployable assets into <code>dist/</code>.</p>
+            <div class="package-command"><span>BUILD</span><code>npm run build</code></div>
+            <div class="package-facts">
+              <div><span>output</span><strong>dist/</strong></div>
+              <div><span>runtime</span><strong>Node 18+</strong></div>
+              <div><span>dependencies</span><strong>0</strong></div>
+              <div><span>production</span><strong><a href="https://web-rust-three-63.vercel.app/" target="_blank" rel="noreferrer">Vercel ↗</a></strong></div>
+            </div>
+            <footer class="deployment-card-footer"><code>npm pack --dry-run</code><span>metadata + assets</span></footer>
+          </article>
+
+          <article class="deployment-card">
+            <header class="deployment-card-header">
+              <div>
+                <p class="deployment-kicker">static host options</p>
+                <h3>Build once, publish <code>dist/</code></h3>
+              </div>
+              <span class="status-badge status-badge--candidate"><span class="status-dot is-yellow" aria-hidden="true"></span>host-agnostic</span>
+            </header>
+            <p class="deployment-intro">Netlify, Vercel, Cloudflare Pages, GitHub Pages, or any static host can use the same release contract.</p>
+            <ul class="host-list">
+              <li><strong>Netlify / Vercel</strong><span><code>npm run build</code> → <code>dist</code></span></li>
+              <li><strong>Cloudflare Pages / GitHub Pages</strong><span>publish generated <code>dist/</code></span></li>
+              <li><strong>Node host</strong><span><code>npm start</code> · <code>PORT</code>/<code>HOST</code></span></li>
+            </ul>
+            <div class="boundary-callout"><span class="status-dot is-amber" aria-hidden="true"></span><p><strong>Evidence boundary:</strong> this is a static evidence snapshot, not a live Forge backend. New runs and AO lifecycle remain unverified until connected.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <footer class="page-footer">
+        <div><span class="footer-mark" aria-hidden="true"></span><strong>FORGE</strong> / static evidence model</div>
+        <p><code>npm run build</code> → <code>dist/</code> · no live claims</p>
+      </footer>
+    </main>
+  </div>
+
+  <div class="inspect-layer" data-inspect-layer hidden>
+    <div class="inspect-backdrop" data-close-inspect></div>
+    <aside class="inspect-drawer" role="dialog" aria-modal="true" aria-labelledby="inspect-title">
+      <div class="drawer-header">
+        <div><p class="section-index">Evidence detail</p><h2 id="inspect-title">Inspect signal</h2></div>
+        <button class="close-button" type="button" data-close-inspect aria-label="Close evidence detail">×</button>
+      </div>
+      <div class="drawer-content" data-drawer-content></div>
+    </aside>
+  </div>
+</body>
+</html>
