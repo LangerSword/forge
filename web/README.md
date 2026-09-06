@@ -5,7 +5,7 @@ A dependency-free static evidence snapshot for the Forge submission. The npm pac
 ## Scripts
 
 ```sh
-npm ci
+npm ci --ignore-scripts
 npm run build    # validate and copy the site into dist/
 npm start        # serve dist/ (PORT and HOST are supported)
 npm run serve    # alias for npm start
@@ -17,20 +17,21 @@ No runtime dependency installation is required beyond Node.js 18 or newer.
 
 ## Vercel deployment
 
-This package is deployed as a static Vercel project from the Forge repository's `web/` directory.
+This package is deployed as a static Vercel project from the Forge repository root. The browser source package remains under `web/`; the root build copies it into `public/` for Vercel's static output contract.
 
 ```text
-Root directory: web
+Root directory: .
 Framework: Other / null
+Install command: npm ci --ignore-scripts
 Build command: npm run build
-Output directory: dist
+Output directory: public
 Production URL: https://web-rust-three-63.vercel.app
 ```
 
 The repository workflow is `.github/workflows/deploy-forge-web.yml`. It runs on pushes that change `web/**` or manually through `workflow_dispatch`:
 
 ```text
-npm ci
+npm ci --ignore-scripts
 npm run build
 asset checks + node --check
 npx vercel deploy --prebuilt --prod
