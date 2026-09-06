@@ -74,4 +74,5 @@ inference (`glm-4-7-flash` for workers) · Supermemory (skill mirror) ·
 Neatlogs (traces)
 
 **Docs:** [SPEC.md](SPEC.md) (source of truth, incl. AI working rules §14) ·
-[architecture.md](architecture.md) · [docs/yc-positioning.md](docs/yc-positioning.md)
+[architecture.md](architecture.md) · [docs/yc-positioning.md](docs/yc-positioning.md) ·
+[docs/hermes-analysis.md](docs/hermes-analysis.md) (how Forge differs from Hermes's built-in learning loop)
