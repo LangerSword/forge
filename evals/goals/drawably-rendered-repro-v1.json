@@ -1,0 +1,78 @@
+{
+  "id": "drawably-rendered-repro-v1",
+  "name": "Rendered website reproducibility",
+  "target_url": "https://drawably.dev/",
+  "target_repository_policy": "never_clone_or_inspect",
+  "created_from": {
+    "observed_at": "2026-09-06",
+    "title": "🐴 drawably — hand-drawn UI controls",
+    "visible_text": [
+      "drawably",
+      "Hand-drawn UI. Fresh pen sketch every mount.",
+      "Every stroke is generated at load. Hover a control to re-sketch.",
+      "Retry", "Saved", "Delete", "Pen", "Pencil", "Marker",
+      "npm i drawably", "MIT", "v0.3.10"
+    ],
+    "semantic_controls": {
+      "buttons": ["agent.md", "Done", "Cancel", "Save", "Wait", "Retry", "Saved", "Delete", "npm i drawably"],
+      "inputs": ["radio", "radio", "checkbox", "text:your name", "checkbox"]
+    },
+    "routes": ["/", "#top", "#install", "#api"]
+  },
+  "capture": {
+    "viewports": [
+      {"name": "desktop", "width": 1440, "height": 1000},
+      {"name": "tablet", "width": 1024, "height": 900},
+      {"name": "mobile", "width": 390, "height": 844}
+    ],
+    "artifacts": [
+      "full_page_screenshot",
+      "section_screenshots",
+      "semantic_dom_outline",
+      "accessibility_tree",
+      "bounding_boxes",
+      "computed_style_tokens",
+      "public_asset_references",
+      "interaction_trace",
+      "console_and_network_error_summary"
+    ],
+    "dynamic_regions": ["hand_drawn_svg_or_canvas_strokes", "random_seed_dependent_sketch_variants"],
+    "allowed_observations": ["frozen_screenshot", "sanitized_dom_outline", "accessibility_tree", "computed_style_tokens", "bounding_boxes", "interaction_outcomes", "console_error_summary"],
+    "forbidden_observations": ["target_html_source", "target_javascript", "source_maps", "target_css_bundles", "repository_contents", "unlisted_network_requests", "target_specific_package_registry"],
+    "asset_policy": "only enumerated, hashed public assets may be used; source maps and target bundles are forbidden",
+    "network_policy": "capture must use an allowlist and record URL, method, response hash, and purpose for every request",
+    "dynamic_visual_policy": "capture two fresh mounts; evaluate stable geometry/tokens and bounded stroke variation, do not simply mask all dynamic regions"
+  },
+  "builder_goal": "Create an independently authored React/Vite page that reproduces the observed public experience using only the frozen rendered capture manifest. Do not clone or inspect the target source repository.",
+  "interaction_trace": [
+    {"action": "load", "url": "https://drawably.dev/"},
+    {"action": "click", "label": "Retry"},
+    {"action": "hover", "label": "Done"},
+    {"action": "click", "label": "Save"},
+    {"action": "focus", "label": "your name"},
+    {"action": "type", "label": "your name", "value": "Forge"},
+    {"action": "click", "label": "Install"},
+    {"action": "click", "label": "API"}
+  ],
+  "graders": {
+    "required": [
+      "build_passes",
+      "semantic_controls_present",
+      "interaction_trace_replays",
+      "no_console_errors",
+      "no_horizontal_overflow",
+      "routes_resolve"
+    ],
+    "visual": [
+      "masked_perceptual_screenshot_similarity",
+      "key_element_bounding_box_deviation",
+      "color_typography_spacing_deviation"
+    ],
+    "quality": [
+      "accessibility_rubric",
+      "independent_implementation_rubric"
+    ]
+  },
+  "splits": {"train": ["layout", "controls"], "validation": ["responsive", "states"], "heldout": ["fresh_mount", "hash_navigation"]},
+  "learning_target": "A validated skill should improve reproduction fidelity or reduce redundant exploration without causing held-out behavior or responsiveness regressions."
+}

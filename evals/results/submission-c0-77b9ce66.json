@@ -1,0 +1,31 @@
+{
+  "claims": [
+    "The verifier observed a failing baseline and a passing repaired candidate.",
+    "The skill is validated only for this bounded C0 task family; no cross-domain transfer is claimed."
+  ],
+  "conditions": {
+    "C0_baseline": {
+      "exit_code": 1,
+      "passed": false
+    },
+    "C0_repaired": {
+      "exit_code": 0,
+      "passed": true
+    }
+  },
+  "evidence": {
+    "baseline_failure_code": "test_failure",
+    "repaired_changed_files": [
+      "c0_target.py"
+    ],
+    "skill_path": "/home/lakshaya/forge/.forge/skills/c0-name-normalizer-v1.json"
+  },
+  "improvement": {
+    "baseline_failed": true,
+    "repaired_passed": true,
+    "skill_created": true
+  },
+  "run_id": "submission-c0-77b9ce66",
+  "schema_version": "forge.eval.v1",
+  "task": "c0-name-normalizer-v1"
+}

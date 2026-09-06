@@ -1,0 +1,28 @@
+[project]
+name = "forge-agent-fleet"
+version = "0.1.0"
+description = "Evidence-gated learning layer for AO-managed agent fleets"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.27,<1",
+  "pydantic>=2.8,<3",
+  "openai>=1.0,<2",
+  "python-dotenv>=1.0,<2",
+  "neatlogs>=1.4.21",
+]
+
+[project.scripts]
+forge = "forge.cli:cli_entrypoint"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3,<9",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/forge"]

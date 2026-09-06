@@ -11,3 +11,7 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 uv.lock.bak
+
+# local JavaScript tooling/build output
+node_modules/
+dist/

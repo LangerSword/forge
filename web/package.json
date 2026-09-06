@@ -1,0 +1,36 @@
+{
+  "name": "forge-evidence-site",
+  "version": "0.1.0",
+  "description": "A static, evidence-backed Forge control-plane snapshot.",
+  "type": "commonjs",
+  "main": "server.js",
+  "license": "MIT",
+  "files": [
+    "index.html",
+    "styles.css",
+    "app.js",
+    "dist",
+    "server.js",
+    "scripts",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.js",
+    "start": "node server.js",
+    "serve": "node server.js",
+    "preview": "npm run build && node server.js --port 4173",
+    "prepack": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "forge",
+    "evidence",
+    "static-site",
+    "deployment"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

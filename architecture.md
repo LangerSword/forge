@@ -256,6 +256,19 @@ real observations; they are not proof of autonomous Forge execution.
   OpenCode is the only observed execution harness and no transfer claim is
   valid.
 
+**Implemented control contract:** `forge.ao-runner.v1` now wraps the documented
+AO CLI spawn flags, polls the session through the AO client, checks an expected
+worktree artifact, optionally invokes an independent verifier, records
+`spawn/poll/check/send/kill/verdict` events, and applies at most one watchdog
+nudge before terminating no-op or hidden-blocked work. The contract is
+fake-tested; the real AO proof remains open until an artifact-producing worker
+run passes independently.
+
+**Harness gate:** `forge harnesses` reports supported, installed, authorized,
+and explicitly smoke-tested states. `cross_harness_pass` requires two distinct
+harnesses satisfying all four dimensions; catalog presence or authorization
+alone does not count as transfer evidence.
+
 The documented `ao spawn`/agent-switch affordances establish an integration
 direction, not a completed run. If programmatic spawn is awkward, the fallback
 is an explicitly disclosed `.forge/briefs/<task>.md` handoff through the AO

@@ -8,12 +8,12 @@ This file records the implementation stack, evidence status, and target integrat
 
 | Layer | Technology | Current evidence |
 |---|---|---|
-| Control plane | Python package, `uv`, Hatchling, Pydantic | `uv build` succeeds; `uv run pytest -q` reports 49 passed |
-| CLI | `forge` console entrypoint | `status`, C0 verification, submission MVP, ledger readback, dashboard scaffold exercised |
+| Control plane | Python package, `uv`, Hatchling, Pydantic | `uv build` succeeds; `uv run pytest -q` reports 61 passed |
+| CLI | `forge` console entrypoint | `status`, `harnesses`, C0 verification, submission MVP, ledger readback, dashboard scaffold exercised |
 | Run state | SQLite ledger + project JSONL journal | Unique submission runs persist goal, baseline, repair, skill candidate, and verdict events |
 | Candidate verification | Frozen verifier-owned pytest bundle in a temporary sandbox | C0 baseline fails, one bounded repair passes, independent final verification passes |
 | Reflection | OpenAI SDK, pinned `gpt-5-nano`, Responses Structured Outputs | Real reflection call returned a schema-valid `SkillCandidate` with `status=candidate` |
-| Execution plane | Agent Orchestrator daemon over loopback + OpenCode | AO health/readiness/catalog/session reads observed; isolated worker worktrees created |
+| Execution plane | Agent Orchestrator daemon over loopback + OpenCode | AO health/readiness/catalog/session reads observed; bounded `forge.ao-runner.v1` tested with fakes; isolated worker worktrees created |
 | Observability | Neatlogs Python SDK, `neatlogs.init`, `neatlogs.wrap`, workflow/tool spans | Fresh `submission-mvp --reflect` trace readback passed: 7 persisted spans and required application I/O |
 | Local fallback | JSONL trace sink and SQLite evidence | Authoritative when hosted trace delivery is unavailable |
 | Website model | Static HTML/CSS/JS in sibling `/home/lakshaya/forge-web` | `node --check app.js` and local HTTP 200 smoke passed |
@@ -43,6 +43,14 @@ AO remains the execution and worktree plane. Forge owns the learning contract, e
 - **Required for novelty:** authorize a second supported harness, preferably Codex or Claude Code, then run a fresh related task with the same context-package contract and no conversation transfer.
 - **Transfer proof:** compare a no-skill baseline, the OpenCode learned-skill condition, and a fresh second-harness condition on the same held-out acceptance checks. Record accuracy, tool calls, interventions, wall time, and reported tokens/cost.
 - **Boundary:** the current AO spawn/completion lifecycle has produced stuck `working` sessions without artifacts in bounded proof attempts. That is a recorded blocker, not a successful autonomous fleet run.
+
+The read-only readiness command is:
+
+```bash
+uv run forge harnesses
+```
+
+It reports supported, installed, authorized, and explicitly smoke-tested states. `cross_harness_pass` is false unless two distinct harnesses satisfy all four conditions. AO status, catalog presence, or authorization alone never counts as a smoke test.
 
 ## Memory strategy
 
@@ -84,7 +92,8 @@ Vercel is the first web deployment adapter target. Android/APK and hosted multi-
 
 The following are observed now:
 
-- 49 passing local tests.
+- 61 passing local tests.
+- The bounded AO Runner/readiness contract and fake-backed tests.
 - Successful package build.
 - Real GPT-5 Nano reflection.
 - C0 failure → bounded repair → final pass.

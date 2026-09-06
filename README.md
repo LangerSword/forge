@@ -115,8 +115,13 @@ For generated web apps, the delivery path is explicit:
 build → verify → preview → human approval → deploy → smoke test → URL
 ```
 
-The first provider adapter is Vercel for web artifacts. Android/APK and store
-deployment are later adapters, not part of the core Track 1 learning claim.
+The evidence website is packaged in `web/` as `forge-evidence-site@0.1.0` and is
+deployed to Vercel at [web-rust-three-63.vercel.app](https://web-rust-three-63.vercel.app/).
+Its GitHub Actions workflow is `.github/workflows/deploy-forge-web.yml`; it runs
+`npm ci`, `npm run build`, static asset checks, and `vercel deploy --prebuilt
+--prod`. Configure the repository `VERCEL_TOKEN` secret before enabling the
+workflow. Android/APK and store deployment are later adapters, not part of the
+core Track 1 learning claim.
 No generated app deploys automatically without an approval event.
 
 Full runbook: `SPEC.md` §10 and §15. AO must be running (`ao status`); Forge drives
