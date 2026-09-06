@@ -34,6 +34,14 @@ Forge is a control plane above AO:
 - **Evidence dashboard** — "what did it learn" drill-down: source trace →
   skill → gate results → later use
 
+### Where Hermes fits
+
+AO currently executes the coding work through OpenCode. Hermes is used as a
+sidecar reflection specialist because AO does not expose a Hermes worker
+adapter: it analyzes bounded run evidence and proposes candidate skills or
+strategy notes. Forge—not Hermes—runs the promotion gate, so reflection is
+never mistaken for verified learning.
+
 ## What improved across iterations
 
 *(populated by `evals/results/` — baseline C0 vs learning-enabled C2,

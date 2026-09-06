@@ -189,7 +189,9 @@ goal-agnostic, not hardcoded to app-building.
 
 | System | Role | Setup owner | Status |
 |---|---|---|---|
-| **AO desktop (Linux)** | worker execution, worktrees, PR/CI | Lakshaya (manual install) | TODO |
+| **AO desktop (Linux)** | worker execution, worktrees, PR/CI; current authorized worker is OpenCode | Lakshaya (manual install) | running; daemon healthy |
+| **OpenCode via AO** | primary coding worker/orchestrator for the first run | AO project config | authorized; active on `forge-1` |
+| **Hermes Agent** | reflective learning specialist: trace analysis, skill/strategy proposals, Forge development; not an AO worker | local Hermes runtime | external to AO by design |
 | **TensorMux** (`https://api.tensormux.com/v1`, model `glm-4-7-flash`) | economical worker inference, OpenAI-compatible | Lakshaya: get `tmx_` key at app.tensormux.com | TODO |
 | **GitHub** | target repo, issues, CI evidence | Lakshaya: fine-grained PAT (repo scope, the demo repo only) | done (gh CLI logged in) |
 | **Supermemory** | memory store for skills/context, MCP/API | Lakshaya: API key; self-host binary if cloud quota tight | TODO |
@@ -303,8 +305,9 @@ contradict this section.)*
 
 ## 15. Open questions (resolve and log in Changelog)
 
-1. Which 2 harnesses for the transfer demo? (default: opencode + Claude Code
-   or Codex — decide at P0 when AO reports readiness.)
+1. Which 2 AO harnesses for the transfer demo? (current: only OpenCode is
+   authorized; install/auth a second supported harness, preferably Codex or
+   Claude Code. Hermes is intentionally not counted as an AO worker.)
 2. Demo target repo for the companion app: fresh minimal Hermes-backend
    mock vs a real small repo? (default: real small repo we scaffold.)
 3. Does Neatlogs accept raw OpenTelemetry or their SDK? Confirm at P0.
@@ -316,3 +319,6 @@ contradict this section.)*
 - **0.1.0** (2026-09-06): baseline spec — combined fleet+learning concept,
   Track 1 focus, AO-as-execution boundary, gated learning loop, eval design,
   16h phased plan, kill rules.
+- **0.1.1** (2026-09-06): live AO check found `forge-1` using OpenCode and no
+  Hermes AO adapter. Hermes is now an external reflection/development
+  specialist; OpenCode is the initial AO execution worker.

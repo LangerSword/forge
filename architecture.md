@@ -114,6 +114,14 @@ Anything the ledger doesn't have is not "seen".
   LLM-judge check (max 1 per run, logged as such).
 
 ### 2.5 Learning agent (the product)
+
+The learning agent may be implemented by Hermes as an external specialist;
+it is not required to be an AO worker. AO's current live catalog has no
+Hermes adapter, while OpenCode is the authorized worker for `forge-1`.
+Forge calls the learning specialist through a narrow file/JSON contract:
+`RunResult` + bounded ledger slice in, schema-validated diagnosis/candidate
+out, then Forge's deterministic gate decides promotion. This prevents
+Hermes's reflective suggestion from becoming an unverified skill.
 Runs per completed (pass or fail) run:
 
 1. **Observe** — pull the run's ledger slice: tool calls, errors, patches,
@@ -225,6 +233,30 @@ Desktop app auto-runs the daemon; CLI needs `ao start`.
   fallback = Forge writes task briefs to `.forge/briefs/<task>.md` and
   Lakshaya/orchestrator clicks through — the loop still counts, demo
   integrity preserved (disclose in README if used).
+
+**Live local check (2026-09-06):** `GET /healthz` and `/readyz` returned
+healthy/ready on port 3001; `GET /api/v1/agents` reported `opencode` as the
+only installed and authorized agent; `GET /api/v1/projects` reported project
+`forge` with orchestrator `opencode`; `GET /api/v1/sessions` reported
+`forge-1`, an idle OpenCode orchestrator session. Hermes does not appear in
+AO's supported catalog. Do not modify AO or claim Hermes is an AO worker.
+
+### 5.1 Hermes bridge contract
+
+For the hackathon, Hermes is a sidecar specialist, not an AO harness:
+
+```text
+Forge writes .forge/review-inbox/<run_id>.json
+Hermes reads the bounded inbox and writes
+  .forge/review-outbox/<run_id>.json
+Forge validates the outbox and runs G1–G3 itself.
+```
+
+The outbox may contain a diagnosis, candidate skill, evidence references,
+and strategy note. It may not directly mark a skill `validated`, mutate the
+registry, merge code, or bypass the held-out evaluator. If Hermes is
+unavailable, use the same contract with a direct LLM client; the evidence
+model remains unchanged.
 
 ## 6. Security boundaries
 
