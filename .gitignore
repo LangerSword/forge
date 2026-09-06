@@ -1,0 +1,13 @@
+# secrets
+.env
+
+# runtime state
+.forge/
+.venv/
+__pycache__/
+*.pyc
+
+# build/eval artifacts that are local-only
+*.egg-info/
+.pytest_cache/
+uv.lock.bak
