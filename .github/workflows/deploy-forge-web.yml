@@ -46,7 +46,23 @@ jobs:
           test -f dist/app.js
           node --check app.js
 
+      - name: Check Vercel credentials
+        id: vercel_credentials
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [[ -n "$VERCEL_ORG_ID" && -n "$VERCEL_PROJECT_ID" && -n "$VERCEL_TOKEN" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Vercel deployment credentials are configured."
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Vercel deployment skipped: configure VERCEL_ORG_ID, VERCEL_PROJECT_ID, and VERCEL_TOKEN repository secrets."
+          fi
+
       - name: Pull Vercel project settings
+        if: steps.vercel_credentials.outputs.configured == 'true'
         run: npx vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -54,6 +70,7 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Prepare Vercel build output
+        if: steps.vercel_credentials.outputs.configured == 'true'
         run: npx vercel build --prod --token "$VERCEL_TOKEN"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -61,6 +78,7 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy prebuilt output to Vercel
+        if: steps.vercel_credentials.outputs.configured == 'true'
         run: npx vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN" --yes
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}

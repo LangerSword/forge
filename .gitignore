@@ -15,3 +15,6 @@ uv.lock.bak
 # local JavaScript tooling/build output
 node_modules/
 dist/
+
+# local demo recording
+recording.mkv
