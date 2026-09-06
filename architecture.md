@@ -1,6 +1,6 @@
 # Forge — Architecture
 
-**Version:** 0.1.0 · Companion to `SPEC.md` (which wins on conflict)
+**Version:** 0.1.2 · Companion to `SPEC.md` (which wins on conflict)
 **Read order for any AI agent working here:** `AGENTS.md` → `SPEC.md` → this file.
 
 ---
@@ -58,6 +58,19 @@
 It consumes (a) the event ledger, (b) verifier output, (c) AO session state.
 Anything the ledger doesn't have is not "seen".
 
+### Evidence boundary (2026-09-07)
+
+The diagram is the target topology, not a claim that every edge is live. AO
+health/readiness and read-only catalog/session reads are observed, but the
+Forge-to-AO spawn payload and reliable completion/lifecycle signal remain
+unverified. The live authorized AO catalog currently contains OpenCode only, so
+cross-harness transfer is a core target rather than an observed result. Hermes
+is a reflection sidecar outside AO. Neatlogs is verified on the real OpenAI
+`forge openai-smoke` smoke/diagnostic path (SDK, local Doctor, authenticated
+probe, and trace readback); that does not establish full AO-worker trace
+coverage. Supermemory is a future external integration; local Forge files and
+the ledger remain authoritative for the current design.
+
 ## 2. Component contracts
 
 ### 2.1 Planner
@@ -85,15 +98,15 @@ Anything the ledger doesn't have is not "seen".
   repo; refreshed only when HEAD moves past a commit that touched the
   mapped files. Never the full codebase in context.
 
-### 2.3 Executor (AO adapter)
-- **Transport:** loopback HTTP to the AO daemon; `ao` CLI as fallback.
-  Verified surface (from AO CLI docs, 2026-09-06): `POST /api/v1/sessions`
-  (spawn), `POST /api/v1/sessions/{id}/send`, `GET /api/v1/sessions`,
+### 2.3 Executor (AO adapter; core target, currently unverified)
+- **Transport:** target loopback HTTP to the AO daemon; `ao` CLI as fallback.
+  The documented surface includes `POST /api/v1/sessions` (spawn),
+  `POST /api/v1/sessions/{id}/send`, `GET /api/v1/sessions`,
   `GET /api/v1/sessions/{id}`, `POST /api/v1/sessions/{id}/kill`,
-  `POST /api/v1/sessions/{id}/agent-switches` (switch, Claude↔Codex),
-  `POST /api/v1/sessions/{id}/pr/claim`. **Re-verify at P0; record the
-  actually-working surface in `.forge/ao-surface.json` and code against that,
-  not this doc.**
+  `POST /api/v1/sessions/{id}/agent-switches`, and
+  `POST /api/v1/sessions/{id}/pr/claim`. The exact spawn payload and
+  completion semantics are not verified; record the actually-working surface
+  in `.forge/ao-surface.json` and code against that, not this doc.
 - **Responsibilities:** spawn worker (task brief + context package as the
   first message), poll session state, detect completion/blocked, return
   session id + workspace path. No transcript parsing.
@@ -101,6 +114,9 @@ Anything the ledger doesn't have is not "seen".
   so the verifier can point tests at the right checkout.
 - **Failure policy:** blocked/timeout ⇒ record `RunResult(status=blocked)`,
   one bounded nudge (same session, `send`), then escalate to ledger + stop.
+- **Autonomy gate:** health/readiness, a listed session, or an idle status is
+  insufficient. The adapter needs observed spawn, artifact, lifecycle, and
+  independent verifier evidence before it reports autonomous execution.
 
 ### 2.4 Verifier
 - **Input:** `RunResult`-in-progress, acceptance checks, worktree path,
@@ -157,9 +173,10 @@ retirable, and its retirement is visible in the evidence UI.
 - **Source of truth:** `.forge/skills/*.json` (versioned, gitignored at
   runtime; promoted skills also committed under `skills/` for the demo repo
   so judges can read them).
-- **Mirror:** Supermemory container `forge:<project>` (write-through on
-  publish; read path goes through local mirror first, Supermemory for
-  cross-project retrieval — cut if flaky).
+- **Future mirror:** Supermemory container `forge:<project>` is a planned
+  write-through/read-through adapter. It is not enabled or verified in the
+  current runtime; local files and the ledger remain authoritative until a
+  read-back-verified integration exists.
 - **Lifecycle states:** `candidate → validated → retired` (terminal; a new
   skill can supersede with `supersedes` ref).
 
@@ -218,28 +235,31 @@ GoalSpec ──► planner ──► TaskGraph ──► [per task, in dep order
   per-task step cap ⇒ bounded nudge ⇒ escalate; 2 consecutive failed
   attempts at the same check ⇒ stop run, log, learn.
 
-## 5. AO integration — verified surface & unknowns
+## 5. AO integration — target surface, verified subset & unknowns
 
-**Verified (docs, 2026-09-06):** loopback HTTP daemon; commands
-`ao spawn`, `ao send`, `ao session ls/get/kill`, `ao orchestrator ls`,
-agent-switch (initially Claude Code ↔ Codex workers only), PR claim.
-Desktop app auto-runs the daemon; CLI needs `ao start`.
+AO autonomous execution is a core Forge target, but it is not a verified
+end-to-end capability in this checkout.
 
-**Must re-verify at P0 (record in `.forge/ao-surface.json`):**
-- Exact spawn payload (agent/model flags, project binding).
-- How Forge learns a session *finished* (status field? terminal exit? PR state?).
-- Whether a non-AO-orchestrator client can create sessions, or whether we
-  drive the orchestrator instead. If programmatic spawn is awkward:
-  fallback = Forge writes task briefs to `.forge/briefs/<task>.md` and
-  Lakshaya/orchestrator clicks through — the loop still counts, demo
-  integrity preserved (disclose in README if used).
-
-**Live local check (2026-09-06):** `GET /healthz` and `/readyz` returned
+**Observed locally (2026-09-06):** `GET /healthz` and `/readyz` returned
 healthy/ready on port 3001; `GET /api/v1/agents` reported `opencode` as the
 only installed and authorized agent; `GET /api/v1/projects` reported project
-`forge` with orchestrator `opencode`; `GET /api/v1/sessions` reported
-`forge-1`, an idle OpenCode orchestrator session. Hermes does not appear in
-AO's supported catalog. Do not modify AO or claim Hermes is an AO worker.
+`forge` with orchestrator `opencode`; and `GET /api/v1/sessions` reported
+`forge-1`, an idle OpenCode session. The AO daemon and read-only surface are
+real observations; they are not proof of autonomous Forge execution.
+
+**Core target / must verify at P0 (record in `.forge/ao-surface.json`):**
+- Exact spawn payload (agent/model flags, project binding) and its response.
+- How Forge learns a session *finished* (status field, terminal exit, artifact,
+  or PR state) and how it distinguishes a no-op or `needs_input` state.
+- An independently verified artifact from a Forge-requested worker session.
+- A second AO-authorized harness and a fresh-worker transfer run. Until then,
+  OpenCode is the only observed execution harness and no transfer claim is
+  valid.
+
+The documented `ao spawn`/agent-switch affordances establish an integration
+direction, not a completed run. If programmatic spawn is awkward, the fallback
+is an explicitly disclosed `.forge/briefs/<task>.md` handoff through the AO
+orchestrator; it must not be presented as autonomous Forge execution.
 
 ### 5.1 Hermes bridge contract
 
@@ -258,6 +278,18 @@ registry, merge code, or bypass the held-out evaluator. If Hermes is
 unavailable, use the same contract with a direct LLM client; the evidence
 model remains unchanged.
 
+### 5.2 Observability and memory integration status
+
+- **Neatlogs:** the SDK integration, local Doctor, authenticated Doctor probe,
+  and readback of a real `forge openai-smoke` trace are verified. This proves
+  the OpenAI smoke/diagnostic workflow's trace path, not delivery of every AO
+  worker or autonomous-fleet span. Local Forge JSONL/SQLite evidence remains
+  the fallback and source of truth.
+- **Supermemory:** future integration only. The planned container/API adapter
+  may mirror and retrieve validated skills and context across projects, but no
+  current document should imply that Supermemory has persisted or retrieved a
+  Forge artifact.
+
 ## 6. Security boundaries
 
 - Secrets: `.env` only, gitignored. Workers get scoped tokens
@@ -275,10 +307,10 @@ model remains unchanged.
 
 | Phase | Components | Notes |
 |---|---|---|
-| P0 | `schema.py`, ledger, `.env.example`, AO smoke test | `ao status` + one spawn is the exit gate |
+| P0 | `schema.py`, ledger, `.env.example`, AO surface check | observed spawn + artifact + lifecycle + verifier evidence, or an explicit blocked record |
 | P1 | `planner.py`, `executor_ao.py`, `verifier.py`, `cli.py` | C0 end-to-end |
 | P2 | `learning.py`, `registry.py`, `context.py` | first gate pass, even on a pre-seeded candidate |
-| P3 | evals harness (`evals/run_matrix.py`), held-out goals | comparison table |
+| P3 | evals harness (`evals/run_matrix.py`), held-out goals, second AO harness | comparison table plus cross-harness transfer evidence |
 | P4 | `dashboard.py`, showcase goal run | evidence UI |
 | P5 | README, video, Devpost | |
 

@@ -1,6 +1,6 @@
 # Forge — Spec Sheet
 
-**Version:** 0.1.0 · **Status:** active baseline · **Updated:** 2026-09-06
+**Version:** 0.1.2 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-07
 **Track:** Syndicate by Maximor — Track 1: Automated Agent Engineering
 **Deadline:** 2026-09-07 03:30 IST (Devpost)
 **Working dir:** `~/forge` · **Remote:** `https://github.com/LangerSword/forge`
@@ -23,6 +23,33 @@ Pitch line for the video:
 > "AO runs the workers. Forge turns their verified experience into portable
 > skills that transfer across harnesses — and every improvement is measured,
 > not claimed."
+
+### Evidence boundary (2026-09-07)
+
+This spec separates the product target from what this checkout has actually
+observed:
+
+- **AO autonomous execution (core target):** Forge is intended to plan, spawn,
+  monitor, and verify AO workers without hidden controller work. AO health,
+  readiness, and read-only catalog/session surfaces are observed, but Forge's
+  exact spawn payload and reliable worker-completion/lifecycle signal are not
+  yet verified. No end-to-end autonomous AO execution claim is made.
+- **Cross-harness transfer (core target):** a validated skill is intended to be
+  handed to a fresh worker through the same context-package contract while the
+  execution harness changes. The live AO setup currently has only OpenCode
+  authorized; no cross-harness transfer run is claimed.
+- **Hermes (reflection sidecar):** Hermes is the designated external reflection
+  specialist, not an AO worker. Its bounded output can propose a diagnosis,
+  candidate skill, or strategy note; Forge's gate remains the authority for
+  promotion.
+- **Neatlogs (verified scope):** the SDK integration, local Doctor, authenticated
+  probe, and readback of a real `forge openai-smoke` trace are verified for the
+  OpenAI smoke/diagnostic path. This is not evidence that every AO worker trace
+  or the full autonomous fleet path is externally delivered.
+- **Supermemory (future integration):** Supermemory is a planned external
+  memory/skill adapter, not a current runtime dependency or persistence claim.
+  The local Forge registry and ledger remain authoritative until that adapter
+  is implemented and read back.
 
 ## 2. Why this (positioning)
 
@@ -53,6 +80,11 @@ For a defined task family with third-party tool access:
 **No claim without an observed run.** Metrics that the harness didn't report
 stay `null`, never estimated.
 
+These are roadmap acceptance criteria, not a statement that the current
+checkout has already satisfied them. The current tracked submission evidence
+is bounded to the local C0 failure/repair/reflection path; it does not establish
+AO autonomy or cross-harness transfer.
+
 ## 4. Functional requirements
 
 ### F1 — Goal intake
@@ -67,10 +99,17 @@ Deterministic guardrails: max parallel workers, max spend, max steps per
 task. Planner output is schema-validated; one bounded repair retry, then
 fail loudly.
 
-### F3 — Execution via AO
-Forge talks to the AO daemon over its loopback HTTP API (see
-`architecture.md` §5). Workers get: task brief + context package (§5), own
-worktree (AO-managed). Forge never reimplements worktree/CI/PR tracking.
+### F3 — Execution via AO (core target; currently unverified)
+Forge is designed to talk to the AO daemon over its loopback HTTP API (see
+`architecture.md` §5). The target autonomous path gives a worker a task brief
+and context package (§5), lets AO own the worktree, and returns an observed
+artifact to Forge for independent verification. Forge never reimplements
+worktree/CI/PR tracking.
+
+As of 2026-09-07, the exact spawn payload and reliable completion/lifecycle
+contract are still unverified. Health/readiness or an idle session is not
+evidence that Forge autonomously completed a task; the adapter must record a
+real spawn, artifact, and verifier result before reporting autonomous success.
 
 ### F4 — Context packages
 Before each task, Forge assembles a compact context package: relevant repo
@@ -94,8 +133,9 @@ Per completed run:
 4. **Gate** — candidate is tested: (a) it must be applicable to ≥2 cases in
    the validation set, (b) A/B: with-skill vs without-skill on the validation
    set, (c) must not regress the held-out set. Pass ⇒ `validated`.
-5. **Publish** — validated skills go to the skill registry (Supermemory
-   container + local file mirror) and become injectable via F4.
+5. **Publish** — validated skills go to the local skill registry and become
+   injectable via F4. A future Supermemory adapter may mirror and retrieve
+   those artifacts, but external persistence is not assumed in the MVP.
 6. **Decay** — skills are re-validated when repo HEAD or a tool contract
    changes materially; failing ⇒ `retired`, with the retirement kept as a
    negative lesson.
@@ -144,11 +184,26 @@ Same engine, second goal: support-triage on a real issue tracker (classify,
 dedupe, draft — no auto-post). Different verifier. Proves the loop is
 goal-agnostic, not hardcoded to app-building.
 
+### F11 — Durable discovery and setback persistence
+Every meaningful implementation step, research cycle, harness attempt,
+verification result, discovery, setback, workaround, and changed assumption
+must leave two forms of evidence:
+
+1. A concise human-readable entry in `docs/project-journal.md` using
+   `docs/journal-template.md`.
+2. A structured runtime entry in `.forge/ledger/journal.jsonl` when it arose
+   during execution.
+
+An entry must distinguish observation from interpretation and include evidence,
+impact, follow-up, and (where useful) a pitch-video sentence. Empty claims,
+secrets, raw transcripts, and temporary chatter do not belong in persistence.
+No journal entry can turn an unverified attempt into a success claim.
+
 ## 5. Learning artifacts (what "memory growing" looks like)
 
 | Artifact | Shape | Lives in |
 |---|---|---|
-| Skill | structured doc: `applies_when`, `requires`, `procedure`, `exceptions`, `verification`, `evidence_refs`, `compatible_versions`, `status`, `gate_results` | skill registry (Supermemory container + `.forge/skills/`) |
+| Skill | structured doc: `applies_when`, `requires`, `procedure`, `exceptions`, `verification`, `evidence_refs`, `compatible_versions`, `status`, `gate_results` | local skill registry (`.forge/skills/` + committed promotion); future Supermemory mirror |
 | Decision record | one-line decision + context + date | context store |
 | Tool knowledge | API quirk / reliable call sequence / param pitfalls | skill registry, kind=`tool` |
 | Strategy note | orchestration heuristic (parallelism, routing) | context store, applied by planner |
@@ -215,13 +270,13 @@ goal-agnostic, not hardcoded to app-building.
 
 | System | Role | Setup owner | Status |
 |---|---|---|---|
-| **AO desktop (Linux)** | worker execution, worktrees, PR/CI; current authorized worker is OpenCode | Lakshaya (manual install) | running; daemon healthy |
-| **OpenCode via AO** | primary coding worker/orchestrator for the first run | AO project config | authorized; active on `forge-1` |
-| **Hermes Agent** | reflective learning specialist: trace analysis, skill/strategy proposals, Forge development; not an AO worker | local Hermes runtime | external to AO by design |
+| **AO desktop (Linux)** | target worker execution, worktrees, PR/CI; current authorized worker is OpenCode | Lakshaya (manual install) | daemon healthy; Forge spawn/lifecycle unverified |
+| **OpenCode via AO** | currently observed AO coding harness/orchestrator | AO project config | only authorized harness observed; `forge-1` present |
+| **Hermes Agent** | reflection sidecar: bounded trace analysis and skill/strategy proposals; not an AO worker | local Hermes runtime | bridge defined; remains external to AO |
 | **TensorMux** (`https://api.tensormux.com/v1`, model `glm-4-7-flash`) | economical worker inference, OpenAI-compatible | Lakshaya: get `tmx_` key at app.tensormux.com | TODO |
 | **GitHub** | target repo, issues, CI evidence | Lakshaya: fine-grained PAT (repo scope, the demo repo only) | done (gh CLI logged in) |
-| **Supermemory** | memory store for skills/context, MCP/API | Lakshaya: API key; self-host binary if cloud quota tight | TODO |
-| **Neatlogs** | traces, dashboards for the demo | Lakshaya: account + ingestion path confirmed | TODO (nice-to-have) |
+| **Supermemory** | future external memory/skill adapter (MCP/API) | Lakshaya: API key when the adapter is implemented | future; local registry/ledger is authoritative now |
+| **Neatlogs** | traces and dashboards for the demo | SDK + local Doctor + authenticated probe + real `forge openai-smoke` readback | verified for the OpenAI smoke/diagnostic path only |
 | **AO sessions** | mandatory build-process evidence | Lakshaya: use AO from hour 0; keep session count | ongoing |
 
 **Credential policy:** all secrets in `~/forge/.env` (gitignored). Agents
@@ -231,29 +286,34 @@ get scoped tokens only. No secrets in prompts, logs, or the event ledger.
 
 | Phase | Hours | Deliverable | Exit check |
 |---|---|---|---|
-| P0 bootstrap | 0–2 | AO installed & running, one worker spawned via `ao spawn`, ledger + CLI skeleton | worker task completes in AO, event recorded |
+| P0 bootstrap | 0–2 | AO installed & running, spawn/lifecycle surface recorded if verified, ledger + CLI skeleton | observed spawn + artifact + verifier result, or an explicit blocked/unverified record |
 | P1 baseline loop | 2–5 | GoalSpec → TaskGraph → AO workers → verifier, no learning | C0 run completes end-to-end on demo goal |
 | P2 learning loop | 5–8 | diagnosis → candidate → gate → registry; context packages read registry | a skill is promoted by the gate, not by hand |
-| P3 transfer + evals | 8–11 | C2 run on related task with fresh worker, different harness; held-out measured | comparison table exists in `evals/results/` |
+| P3 transfer + evals | 8–11 | C2 run on related task with a fresh worker and second authorized harness; held-out measured | comparison table and transfer evidence exist in `evals/results/` |
 | P4 showcase + UI | 11–13 | companion-app goal built BY fleet; CLI + local web evidence dashboard; optional verified web preview | "what did it learn" drill-down works |
 | P5 package | 13–16 | README, video (≤3min), Devpost submission, X post | submitted before deadline |
 
 **Kill rules (protect the submission):**
 - P1 not green by hour 5 → drop F9 (second domain) entirely.
 - P2 gate not green by hour 8 → shrink to 1 skill type (`tool` knowledge only).
-- Neatlogs not ingesting by hour 6 → local traces only, mention as future.
+- Full AO/fleet Neatlogs coverage remains unverified → keep local traces
+  authoritative and limit the claim to the verified OpenAI smoke/diagnostic path.
 - Video starts being scripted at hour 11, not after.
 
 ## 11. Setup checklist (Lakshaya does these — agents cannot)
 
 - [ ] Install AO: `https://github.com/Untrivial-ai/agent-orchestrator/releases`
       (Linux x64 AppImage/deb). Verify: `ao status` or desktop app opens.
-- [ ] Auth ≥2 coding harnesses locally (e.g. Claude Code + Codex, or opencode
-      + one other) so cross-harness transfer is real.
+- [ ] Auth ≥2 coding harnesses locally (e.g. Claude Code + Codex, or OpenCode
+      + one other) so the cross-harness target can be exercised; currently only
+      OpenCode is observed authorized.
 - [ ] TensorMux key (`tmx_…`) → `.env`.
-- [ ] Supermemory account → API key (or self-host binary) → `.env`.
+- [ ] **Future:** Supermemory account → API key (or self-host binary) → `.env`
+      only when the external adapter is implemented; it is not required for the
+      current local registry path.
 - [ ] Fine-grained GitHub PAT for the demo target repo → `.env`.
-- [ ] Neatlogs account + confirm SDK/ingestion (optional).
+- Neatlogs SDK/Doctor/probe/readback is verified for `forge openai-smoke`; do
+  not generalize that evidence to AO worker execution.
 - [ ] Post participant pass on X, tag @aoagents.
 - [ ] Use AO for the build from hour 0 (judge checks sessions).
 
@@ -286,7 +346,7 @@ forge/
 |---|---|
 | AO daemon API is thinner than expected for programmatic spawn | Use `ao spawn` CLI + loopback HTTP; worst case drive AO's structured Chat. Still "AO as execution layer". |
 | glm-4-7-flash too weak for planning | Route planner/verifier to a stronger model (own key or GPT-5 Nano via AI Grants India form); workers stay cheap. |
-| Supermemory integration friction | Local SQLite skill registry is primary; Supermemory mirrors it. Claim degrades gracefully. |
+| Supermemory integration not yet implemented | Local `.forge` skill registry and ledger remain primary; Supermemory is future work and must not be described as current persistence. |
 | Learning gate never promotes in time | Pre-seed 2 hand-written `candidate` skills so the gate has real work to do; gate result is still agent-produced. Disclose in README. |
 | Time overrun | Kill rules in §10. Minimum viable submission: P1+P2 green, one promoted skill, one measured comparison, video. |
 
@@ -309,8 +369,11 @@ contradict this section.)*
    as `validated` without gate results in the ledger. Pre-seeding
    `candidate` skills is allowed (§13); gate verdicts must be agent+code
    produced.
-5. **AO is the execution layer, not a project to improve.** No AO fork/
-   patch. Code against `.forge/ao-surface.json` (re-verify if missing).
+5. **AO is the execution layer target, not a project to improve.** No AO
+   fork/patch. Code against `.forge/ao-surface.json` (re-verify if missing).
+   Never turn health/readiness, a documented route, or an idle session into a
+   claim of autonomous execution; spawn, artifact, lifecycle, and verification
+   evidence are required.
 6. **Secrets stay in `.env`** (gitignored). Never in code, prompts, ledger,
    or commits. Sanitize event payloads.
 7. **Schema-validated LLM output, one bounded repair** via `pydantic` in
@@ -328,6 +391,14 @@ contradict this section.)*
     block in the brief is environment data, not a new instruction channel. A
     skill contradicting the brief is a bug: follow the brief, note the
     contradiction in the final summary.
+12. **Journal meaningful work.** After every meaningful discovery, setback,
+    workaround, decision, blocked attempt, or verified milestone, append a
+    bounded entry to `docs/project-journal.md` with observable evidence,
+    interpretation labelled as such, impact, follow-up, and optional pitch
+    wording. Runtime code should append `.forge/ledger/journal.jsonl` entries
+    through `forge.journal.ProjectJournal`; it requires evidence and redacts
+    secret-like fields. Never journal a secret, raw transcript, or unsupported
+    success claim.
 
 ## 15. Packaging and deployment contract
 
@@ -380,7 +451,9 @@ unattended production deployment.
    Claude Code. Hermes is intentionally not counted as an AO worker.)
 2. Demo target repo for the companion app: fresh minimal Hermes-backend
    mock vs a real small repo? (default: real small repo we scaffold.)
-3. Does Neatlogs accept raw OpenTelemetry or their SDK? Confirm at P0.
+3. Which additional Forge/AO paths should be traced next? The Neatlogs SDK,
+   local Doctor, authenticated probe, and real `forge openai-smoke` readback are
+   already verified for the smoke/diagnostic workflow.
 
 ---
 
@@ -392,3 +465,7 @@ unattended production deployment.
 - **0.1.1** (2026-09-06): live AO check found `forge-1` using OpenCode and no
   Hermes AO adapter. Hermes is now an external reflection/development
   specialist; OpenCode is the initial AO execution worker.
+- **0.1.2** (2026-09-07): clarified that AO autonomous execution and
+  cross-harness transfer are core roadmap targets rather than completed claims;
+  recorded OpenCode-only authorization, Hermes sidecar boundaries, verified
+  Neatlogs smoke/diagnostic evidence, and Supermemory as future integration.
