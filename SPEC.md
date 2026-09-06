@@ -109,13 +109,37 @@ wall time, tool calls, retries, human interventions. Cost accounting is
 per-run and per-skill-amortization (skill creation cost vs savings on
 later runs).
 
-### F8 — Evidence UI
-Single-page local dashboard (static HTML + small API): runs, traces,
-skill lifecycle (candidate → validated → retired), before/after comparison
-view, and the "what did it learn" drill-down: source trace → skill diff →
-gate results → later use.
+### F8 — Evidence UI and operator surfaces
+Forge has a layered product surface:
 
-### F9 — Multi-domain proof
+1. **CLI (ship now):** `forge run`, `forge eval`, `forge skills`,
+   `forge deploy`, `forge dashboard`, `forge status`. This is the stable
+   automation interface and is what AO/OpenCode and CI call.
+2. **Local web dashboard (ship now):** `forge dashboard` serves the evidence
+   UI on localhost: runs, traces, skill lifecycle (candidate → validated →
+   retired), before/after comparisons, and the "what did it learn"
+   drill-down: source trace → skill diff → gate results → later use.
+3. **TUI (defer):** a thin terminal view can be added after the web dashboard
+   if time remains, but it must call the same CLI/API. Do not create a second
+   state model or reimplement AO's Kanban. The MVP is CLI + web.
+
+The web dashboard is an operator/evidence surface, not a SaaS control plane:
+no auth, multi-tenancy, hosted worker execution, or arbitrary remote code
+execution in the hackathon MVP.
+
+### F9 — App delivery
+For web artifacts, Forge can run a provider adapter after verification:
+
+`build → test → preview → human approval → deploy → smoke test → URL`
+
+The hackathon adapter is **Vercel-first** for static/React/Next-style apps;
+deployment is explicit and opt-in, never an automatic side effect of a worker.
+The adapter records provider, deployment ID/URL, commit, build output,
+smoke-test result, and rollback target. Android packaging is a later adapter
+(EAS/Gradle/Play internal track); the hackathon can build a small mobile
+companion artifact but should not promise store publication.
+
+### F10 — Multi-domain proof
 Same engine, second goal: support-triage on a real issue tracker (classify,
 dedupe, draft — no auto-post). Different verifier. Proves the loop is
 goal-agnostic, not hardcoded to app-building.
@@ -177,10 +201,12 @@ goal-agnostic, not hardcoded to app-building.
 
 - No AO fork. AO is used as-is; we build above its API.
 - No new harness integrations beyond what AO already supports.
-- No web app, no auth, no multi-tenant, no cloud deploy (local dashboard
-  only; "live link" = repo + video).
-- No Android app shipped. The companion-app *goal* is the showcase build
-  artifact only, built BY the fleet, not by us by hand.
+- No hosted Forge SaaS, auth, multi-tenant control plane, or arbitrary remote
+  execution. The Forge dashboard is local-first; a read-only hosted evidence
+  snapshot is optional if time permits.
+- No Android store publication. The companion-app goal is a showcase build
+  artifact; package/APK generation is optional and deployment is a later
+  adapter, not a core learning claim.
 - No weight updates / fine-tuning. Learning = memory + skills + prompts +
   routing, all explicit and inspectable.
 - No auto-merge without CI green. Human can always veto in AO's UI.
@@ -209,7 +235,7 @@ get scoped tokens only. No secrets in prompts, logs, or the event ledger.
 | P1 baseline loop | 2–5 | GoalSpec → TaskGraph → AO workers → verifier, no learning | C0 run completes end-to-end on demo goal |
 | P2 learning loop | 5–8 | diagnosis → candidate → gate → registry; context packages read registry | a skill is promoted by the gate, not by hand |
 | P3 transfer + evals | 8–11 | C2 run on related task with fresh worker, different harness; held-out measured | comparison table exists in `evals/results/` |
-| P4 showcase + UI | 11–13 | companion-app goal built BY fleet; evidence dashboard | "what did it learn" drill-down works |
+| P4 showcase + UI | 11–13 | companion-app goal built BY fleet; CLI + local web evidence dashboard; optional verified web preview | "what did it learn" drill-down works |
 | P5 package | 13–16 | README, video (≤3min), Devpost submission, X post | submitted before deadline |
 
 **Kill rules (protect the submission):**
@@ -303,7 +329,51 @@ contradict this section.)*
     skill contradicting the brief is a bug: follow the brief, note the
     contradiction in the final summary.
 
-## 15. Open questions (resolve and log in Changelog)
+## 15. Packaging and deployment contract
+
+### Forge itself
+
+**MVP distribution:** a Python package installed with `uv tool install` or
+run from a checkout with `uv run forge`. The package exposes the CLI and a
+local dashboard server. It stores runtime state under `.forge/` in the target
+project, not in a global hidden database. This keeps runs reproducible and
+lets a judge clone the repo and inspect evidence.
+
+**MVP process topology:**
+
+```text
+forge CLI ──► Forge control plane ──► AO daemon (localhost)
+     │                  │
+     │                  ├── SQLite event ledger (.forge/)
+     │                  ├── skill registry (.forge/skills/)
+     │                  └── local dashboard (localhost)
+     └── optional Hermes sidecar review (JSON inbox/outbox)
+```
+
+Forge does not replace AO's desktop Kanban. AO remains the worker/process
+supervisor; Forge owns learning, evidence, and deployment policy.
+
+### Generated applications
+
+Deployment is a separate, explicit stage in the goal contract:
+
+```jsonc
+{"deployment": {"target": "vercel", "project": "demo-app",
+                "approval": "human", "smoke_url": "/health"}}
+```
+
+The deploy adapter may run only after the verifier passes and a human approval
+event is recorded. It must support dry-run/preview, capture the resulting URL
+and deployment ID, run a smoke test, and preserve the previous deployment as
+rollback metadata. Provider credentials stay in `.env`; they are never given
+to a general worker prompt.
+
+**What we show in the demo:** the fleet builds a small web artifact, Forge
+verifies it, the operator opens a preview/local URL, then explicitly deploys
+it if the provider is configured. We do not claim Android store delivery or
+unattended production deployment.
+
+## 16. Open questions (resolve and log in Changelog)
 
 1. Which 2 AO harnesses for the transfer demo? (current: only OpenCode is
    authorized; install/auth a second supported harness, preferably Codex or

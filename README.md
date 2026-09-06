@@ -66,7 +66,25 @@ python -m forge.cli run evals/goals/<goal>.json --condition C0
 python -m forge.cli dashboard
 ```
 
-Full runbook: `SPEC.md` §10. AO must be running (`ao status`); Forge drives
+## Product surfaces and deployment
+
+Forge is packaged as a project-local Python CLI plus a local web dashboard;
+it is not a second Kanban competing with AO. AO supervises workers and
+worktrees, while Forge owns the ledger, learning gate, evidence, and
+deployment policy. A future TUI will call the same API rather than introduce
+another state model.
+
+For generated web apps, the delivery path is explicit:
+
+```text
+build → verify → preview → human approval → deploy → smoke test → URL
+```
+
+The first provider adapter is Vercel for web artifacts. Android/APK and store
+deployment are later adapters, not part of the core Track 1 learning claim.
+No generated app deploys automatically without an approval event.
+
+Full runbook: `SPEC.md` §10 and §15. AO must be running (`ao status`); Forge drives
 it over the loopback API recorded in `.forge/ao-surface.json`.
 
 ## How AO was used
