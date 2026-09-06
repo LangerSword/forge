@@ -115,27 +115,22 @@ For generated web apps, the delivery path is explicit:
 build → verify → preview → human approval → deploy → smoke test → URL
 ```
 
-The evidence website is packaged in `web/` as `forge-evidence-site@0.1.0` and is
+The evidence website is packaged at the repository root as `forge@3.0.0` and is
 deployed to Vercel at [web-rust-three-63.vercel.app](https://web-rust-three-63.vercel.app/).
-Its GitHub Actions workflow is `.github/workflows/deploy-forge-web.yml`; it runs
-`npm ci`, `npm run build`, static asset checks, and `vercel deploy --prebuilt
---prod`. Configure the repository `VERCEL_TOKEN` secret before enabling the
-workflow. Android/APK and store deployment are later adapters, not part of the
-core Track 1 learning claim.
-No generated app deploys automatically without an approval event.
-
-### Install the evidence site from GitHub
-
-The npm registry name `forge` is already owned by an unrelated package. The
-Forge evidence site is therefore installable directly from this repository:
+The package exposes a `forge` CLI that serves the static evidence snapshot:
 
 ```bash
-npm install github:LangerSword/forge
-npx forge-evidence-site --port 4173
+npm install forge
+forge --port 4173
 ```
 
-The package builds its static assets during installation and serves the
-read-only evidence snapshot. It does not connect to a live Forge backend.
+The npm package is published from `.github/workflows/publish-npm.yml` on a `v*`
+tag or by manual workflow dispatch. The workflow uses npm Trusted Publishing
+(OIDC) and provenance; configure the `forge` package's trusted publisher for
+`LangerSword/forge` and `publish-npm.yml` once on npmjs.com. The package does
+not connect to a live Forge backend. Android/APK and store deployment are later
+adapters, not part of the core Track 1 learning claim.
+No generated app deploys automatically without an approval event.
 
 Full runbook: `SPEC.md` §10 and §15. AO must be running (`ao status`); Forge drives
 it over the loopback API recorded in `.forge/ao-surface.json`.

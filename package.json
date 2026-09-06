@@ -1,13 +1,12 @@
 {
-  "name": "forge-evidence-site",
-  "version": "0.1.0",
-  "description": "A static, evidence-backed Forge control-plane snapshot.",
+  "name": "forge",
+  "version": "3.0.0",
+  "description": "A static, evidence-backed Forge control-plane snapshot for agent fleets.",
   "type": "commonjs",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/LangerSword/forge.git",
-    "directory": "web"
+    "url": "git+https://github.com/LangerSword/forge.git"
   },
   "homepage": "https://web-rust-three-63.vercel.app/",
   "bugs": {
@@ -22,7 +21,7 @@
     "web/README.md"
   ],
   "bin": {
-    "forge-evidence-site": "bin/forge-evidence-site.js"
+    "forge": "bin/forge-evidence-site.js"
   },
   "scripts": {
     "build": "node scripts/build-web.js",
@@ -42,12 +41,5 @@
     "observability",
     "static-site",
     "deployment"
-  ],
-  "main": "index.js",
-  "directories": {
-    "doc": "docs",
-    "test": "tests"
-  },
-  "devDependencies": {},
-  "author": ""
+  ]
 }
