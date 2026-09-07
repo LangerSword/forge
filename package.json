@@ -46,6 +46,6 @@
     "drawably": "^0.3.10"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public"
   }
 }

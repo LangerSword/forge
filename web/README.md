@@ -36,11 +36,12 @@ Output directory: public
 Production URL: https://web-rust-three-63.vercel.app
 ```
 
-The package is also the source for the repository's GitHub Packages release. The
-publish workflow uses the repository `GITHUB_TOKEN` with `packages: write`:
+The package is published to the public npm registry as `@langersword/forge`.
+The publish workflow uses npm Trusted Publishing with GitHub OIDC; users do not
+need credentials to install the public package:
 
 ```text
-registry: https://npm.pkg.github.com
+registry: https://registry.npmjs.org
 package: @langersword/forge
 ```
 

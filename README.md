@@ -9,6 +9,12 @@ that survive an A/B gate become portable skills; a fresh worker on a
 *different harness* is intended to get the skill, not the conversation — and
 the improvement is measured, not claimed.
 
+Forge now includes a bounded controller runtime: it validates a GoalSpec,
+builds a dependency-aware TaskGraph, assembles fenced task context, dispatches
+AO runner tasks, records task verdicts, and invokes a candidate-learning hook
+after the run closes. Dry-run planning and fake-backed fleet execution are
+covered by tests.
+
 The current hackathon artifact verifies a bounded local
 failure → repair → reflection → verification path. AO autonomous spawn/lifecycle
 and cross-harness transfer are core roadmap targets, not completed claims in
@@ -48,12 +54,15 @@ agents make this worse, not better.
 
 ## What we built
 
-Forge is a control plane above AO:
+Forge is the agent/controller runtime above AO, with learning and evidence as
+first-class planes:
 
+- **Agent/controller** — owns GoalSpec intake, dependency scheduling, bounded
+  fleet lifecycle, and terminal run reports
 - **Planner** — goal → task graph, with deterministic budget/harness guardrails
-- **Context builder** — budgeted context packages: repo map, decisions, and
+- **Context builder** — fenced, task-scoped context packages: repo map, decisions, and
   only *validated* skills (references, not copies)
-- **Executor** — target AO worker adapter (worktrees, PR/CI stay AO's); the
+- **Executor** — AO worker adapter (worktrees, PR/CI stay AO's); the
   current spawn/lifecycle contract is still unverified
 - **Verifier** — independent-model acceptance checks; the only component that
   can mark a run passed
@@ -118,24 +127,17 @@ build → verify → preview → human approval → deploy → smoke test → UR
 The Forge product site is packaged as `@langersword/forge@3.1.0` and is deployed
 to Vercel at [web-rust-three-63.vercel.app](https://web-rust-three-63.vercel.app/).
 It is a static product/docs/support site, not a live AO tracker or hosted Forge
-backend. The package installs the `forge` executable from GitHub Packages:
+backend. The public npm package installs the `forge` executable:
 
 ```bash
-npm config set @langersword:registry https://npm.pkg.github.com
 npm install @langersword/forge
 npx forge --port 4173
 ```
 
-Authenticate to GitHub Packages with a GitHub token that has `read:packages`:
-
-```bash
-npm login --scope=@langersword --registry=https://npm.pkg.github.com
-```
-
-The package is published by `.github/workflows/publish-npm.yml` on a `v*` tag or
-manual dispatch using the repository's built-in `GITHUB_TOKEN` with
-`packages: write`. The unscoped npmjs.com package `forge` is unrelated and is
-not modified.
+The first publish is a one-time maintainer action. Once the package exists on
+npmjs.com, anyone can install it without logging in. Future releases run from
+`.github/workflows/publish-npm.yml` using npm Trusted Publishing and GitHub OIDC.
+The unscoped npmjs.com package `forge` is unrelated and is not modified.
 No generated app deploys automatically without an approval event.
 
 Full runbook: `SPEC.md` §10 and §15. AO must be running (`ao status`); Forge drives
