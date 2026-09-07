@@ -115,9 +115,9 @@ For generated web apps, the delivery path is explicit:
 build → verify → preview → human approval → deploy → smoke test → URL
 ```
 
-The evidence website is packaged at the repository root as `forge@3.0.0` and is
+The Forge product site is packaged at the repository root as `forge@3.1.0` and is
 deployed to Vercel at [web-rust-three-63.vercel.app](https://web-rust-three-63.vercel.app/).
-The package exposes a `forge` CLI that serves the static evidence snapshot:
+It is a static product/docs/support site, not a live AO tracker or hosted Forge backend.
 
 ```bash
 npm install forge

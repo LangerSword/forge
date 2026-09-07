@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Forge documentation: install the local-first learning layer, understand the evidence model, and run the bounded submission loop.">
+  <title>Docs — Forge</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body data-page="docs">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header">
+    <div class="container nav-inner">
+      <a class="brand" href="/" aria-label="Forge home"><span class="brand-mark" aria-hidden="true"><i></i><b></b></span><span class="brand-word">forge</span><span class="brand-sub">agent learning layer</span></a>
+      <nav class="primary-nav" aria-label="Primary navigation"><a href="/">Product</a><a class="is-active" href="/docs/">Docs</a><a href="/support/">Support</a><a href="https://github.com/LangerSword/forge" target="_blank" rel="noreferrer">GitHub ↗</a></nav>
+      <a class="button button--small button--accent nav-cta" href="/docs/installation.html">Install Forge <span aria-hidden="true">↗</span></a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open navigation"><span></span><span></span></button>
+    </div>
+    <div class="mobile-menu" id="mobile-menu" hidden><nav class="container" aria-label="Mobile navigation"><a href="/">Product <span>01</span></a><a class="is-active" href="/docs/">Docs <span>02</span></a><a href="/support/">Support <span>03</span></a><a href="https://github.com/LangerSword/forge" target="_blank" rel="noreferrer">GitHub <span>↗</span></a><a class="mobile-install" href="/docs/installation.html">Install Forge <span>↗</span></a></nav></div>
+  </header>
+  <main id="main-content" class="docs-main">
+    <div class="container docs-layout">
+      <aside class="docs-sidebar" aria-label="Documentation navigation">
+        <p class="docs-label">Forge docs</p>
+        <nav><a class="is-active" href="/docs/">Overview <span>01</span></a><a href="/docs/installation.html">Installation <span>02</span></a><a href="/docs/architecture.html">Architecture <span>03</span></a><a href="/docs/cli.html">CLI reference <span>04</span></a></nav>
+        <div class="docs-sidebar-note"><span class="status-line status-line--green"><i></i> local-first</span><p>The runtime, ledger, and verifier live in your checkout.</p></div>
+      </aside>
+      <article class="doc-content">
+        <p class="section-kicker">Forge documentation / overview</p>
+        <h1>Build agents that<br><em>can show their work.</em></h1>
+        <p class="doc-lede">Forge is a learning and evidence layer for agent fleets. It gives execution a verifier, gives failure a bounded repair path, and gives reflection a promotion gate.</p>
+        <div class="doc-callout doc-callout--amber"><strong>Current boundary.</strong> The local C0 loop is verified. AO autonomous completion, second-harness transfer, and Supermemory are explicit future proof points—not features this site pretends are live.</div>
+        <h2>Choose a path</h2>
+        <div class="doc-link-grid">
+          <a href="/docs/installation.html"><span class="doc-link-index">01</span><div><strong>Install and run</strong><p>Set up the Python project, configure optional providers, and run the local checks.</p></div><span>→</span></a>
+          <a href="/docs/architecture.html"><span class="doc-link-index">02</span><div><strong>Understand the model</strong><p>See how execution, verification, reflection, evidence, and promotion fit together.</p></div><span>→</span></a>
+          <a href="/docs/cli.html"><span class="doc-link-index">03</span><div><strong>Use the CLI</strong><p>Inspect status, harness readiness, submission runs, and exact ledger readback.</p></div><span>→</span></a>
+          <a href="/support/"><span class="doc-link-index">04</span><div><strong>Fix setup issues</strong><p>Follow the support checklist for providers, Neatlogs, AO, and static-site preview.</p></div><span>→</span></a>
+        </div>
+        <h2>What Forge owns</h2>
+        <div class="doc-table">
+          <div><span>acceptance</span><strong>Independent verifier</strong><p>Only a verifier-backed artifact can become a passed run.</p></div>
+          <div><span>recovery</span><strong>Bounded repair</strong><p>One evidence-based repair path; no unbounded autonomous loop.</p></div>
+          <div><span>learning</span><strong>Candidate skill + gate</strong><p>Reflection proposes. Applicability, A/B, and held-out checks decide.</p></div>
+          <div><span>provenance</span><strong>Ledger + trace</strong><p>SQLite/JSONL remains authoritative; Neatlogs provides readback for the verified path.</p></div>
+        </div>
+        <h2>Useful source links</h2>
+        <ul class="source-list"><li><a href="https://github.com/LangerSword/forge" target="_blank" rel="noreferrer">Forge source repository <span>↗</span></a></li><li><a href="https://hermes-agent.nousresearch.com/docs/" target="_blank" rel="noreferrer">Hermes Agent docs <span>↗</span></a></li><li><a href="https://opencode.ai/docs" target="_blank" rel="noreferrer">OpenCode docs <span>↗</span></a></li><li><a href="https://docs.neatlogs.com/" target="_blank" rel="noreferrer">Neatlogs docs <span>↗</span></a></li></ul>
+      </article>
+    </div>
+  </main>
+  <footer class="site-footer"><div class="container footer-grid"><div><a class="footer-brand" href="/">forge<span>·</span></a><p>The learning layer for agent fleets.</p></div><div class="footer-links"><a href="/">Product</a><a href="/support/">Support</a><a href="https://github.com/LangerSword/forge" target="_blank" rel="noreferrer">GitHub ↗</a></div><div class="footer-note"><span class="status-line status-line--green"><i></i> docs are static</span><p>Commands and claims are tied to the repository.</p></div></div></footer>
+</body>
+</html>

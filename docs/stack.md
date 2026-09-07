@@ -16,7 +16,7 @@ This file records the implementation stack, evidence status, and target integrat
 | Execution plane | Agent Orchestrator daemon over loopback + OpenCode | AO health/readiness/catalog/session reads observed; bounded `forge.ao-runner.v1` tested with fakes; isolated worker worktrees created |
 | Observability | Neatlogs Python SDK, `neatlogs.init`, `neatlogs.wrap`, workflow/tool spans | Fresh `submission-mvp --reflect` trace readback passed: 7 persisted spans and required application I/O |
 | Local fallback | JSONL trace sink and SQLite evidence | Authoritative when hosted trace delivery is unavailable |
-| Website model | Static HTML/CSS/JS in sibling `/home/lakshaya/forge-web` | `node --check app.js` and local HTTP 200 smoke passed |
+| Website model | Static product/docs/support site in tracked `web/` package | Product homepage, four docs routes, support route, self-authored SVG artifacts; Vercel public readback passed |
 
 ## Target autonomous fleet
 
@@ -80,7 +80,7 @@ Official references:
 
 ## Deployment target
 
-Forge itself is local-first for the hackathon. The sibling website is a static evidence/control-plane model that can be hosted on any static host. The generated-app target path is:
+Forge itself is local-first for the hackathon. The tracked `web/` package is a static product/docs/support site that can be hosted on any static host. It presents repository-backed evidence and installation guidance; it does not connect to a live AO tracker or Forge backend. The generated-app target path is:
 
 ```text
 build → independent verification → preview → human approval → deploy → smoke test → URL

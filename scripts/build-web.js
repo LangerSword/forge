@@ -6,26 +6,35 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const source = path.join(root, 'web');
 const output = path.join(root, 'public');
-const assets = ['index.html', 'styles.css', 'app.js'];
+const ignored = new Set(['node_modules', 'dist', '.git', '.vercel', '.gitignore', 'package.json', 'package-lock.json', 'README.md', 'DESIGN.md', 'server.js', 'vercel.json', 'scripts']);
 
-for (const asset of assets) {
-  const sourcePath = path.join(source, asset);
-  if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
-    throw new Error(`required web asset is missing: ${asset}`);
-  }
+function collect(directory, prefix = '') {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    if (ignored.has(entry.name)) return [];
+    const relative = path.join(prefix, entry.name);
+    const absolute = path.join(directory, entry.name);
+    if (entry.isDirectory()) return collect(absolute, relative);
+    return [relative];
+  });
+}
+
+const assets = collect(source).filter((file) => !file.startsWith('dist' + path.sep));
+if (!assets.includes('index.html') || !assets.includes('styles.css') || !assets.includes('app.js')) {
+  throw new Error('required web assets are missing');
 }
 
 const html = fs.readFileSync(path.join(source, 'index.html'), 'utf8');
 for (const reference of ['styles.css', 'app.js']) {
-  if (!html.includes(reference)) {
-    throw new Error(`web/index.html does not reference ${reference}`);
-  }
+  if (!html.includes(reference)) throw new Error(`web/index.html does not reference ${reference}`);
 }
 
 fs.rmSync(output, { recursive: true, force: true });
 fs.mkdirSync(output, { recursive: true });
-for (const asset of assets) {
-  fs.copyFileSync(path.join(source, asset), path.join(output, asset));
+for (const relative of assets) {
+  const sourcePath = path.join(source, relative);
+  const outputPath = path.join(output, relative);
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.copyFileSync(sourcePath, outputPath);
 }
 
-console.log(`Forge root build: copied ${assets.length} static assets to public/`);
+console.log(`Forge root build: copied ${assets.length} static site files to public/`);

@@ -1,7 +1,7 @@
 {
   "name": "forge",
-  "version": "3.0.0",
-  "description": "A static, evidence-backed Forge control-plane snapshot for agent fleets.",
+  "version": "3.1.0",
+  "description": "The Forge product, documentation, and support site for agent fleets.",
   "type": "commonjs",
   "license": "MIT",
   "repository": {

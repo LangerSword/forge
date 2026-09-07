@@ -1,7 +1,7 @@
 {
   "name": "forge-evidence-site",
-  "version": "0.1.0",
-  "description": "A static, evidence-backed Forge control-plane snapshot.",
+  "version": "0.2.0",
+  "description": "The static Forge product, documentation, and support site.",
   "type": "commonjs",
   "main": "server.js",
   "license": "MIT",

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" role="img" aria-labelledby="title desc">
+  <title id="title">C0 evidence artifact</title>
+  <desc id="desc">A static terminal-like evidence panel showing a failed baseline, one bounded repair, and a passing final verification.</desc>
+  <rect width="760" height="420" rx="14" fill="#111613" stroke="#334238"/>
+  <rect width="760" height="42" rx="14" fill="#1b231d"/>
+  <circle cx="22" cy="21" r="5" fill="#f09b8f"/><circle cx="40" cy="21" r="5" fill="#edc879"/><circle cx="58" cy="21" r="5" fill="#a8e6b8"/>
+  <text x="88" y="26" fill="#9aaa9a" font-family="monospace" font-size="12">submission-c0-82dffafc / verifier readback</text>
+  <text x="36" y="86" fill="#78907e" font-family="monospace" font-size="12">$ forge submission-mvp --reflect</text>
+  <text x="36" y="120" fill="#f09b8f" font-family="monospace" font-size="14">baseline   EXIT 1   4 failed   NotImplementedError</text>
+  <line x1="36" y1="142" x2="724" y2="142" stroke="#2c382f"/>
+  <text x="36" y="178" fill="#edc879" font-family="monospace" font-size="14">repair     1 attempt   c0_target.py changed</text>
+  <line x1="36" y1="200" x2="724" y2="200" stroke="#2c382f"/>
+  <text x="36" y="236" fill="#a8e6b8" font-family="monospace" font-size="14">final      EXIT 0   4 passed   independent verifier</text>
+  <rect x="36" y="270" width="688" height="78" rx="7" fill="#18231b" stroke="#355b40"/>
+  <text x="56" y="300" fill="#78907e" font-family="monospace" font-size="11">REFLECTION</text>
+  <text x="56" y="326" fill="#eaf3e8" font-family="monospace" font-size="13">gpt-5-nano → candidate skill → status=candidate</text>
+  <text x="36" y="384" fill="#718173" font-family="monospace" font-size="11">5 ledger events · 7 Neatlogs spans · no promotion claim</text>
+</svg>

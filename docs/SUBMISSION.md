@@ -213,7 +213,7 @@ The following remain open and are deliberately not hidden in the pitch:
 3. **Skill promotion:** the observed reflection output is `candidate`; G1 applicability, G2 A/B benefit, and G3 held-out no-regression promotion evidence are not complete for this submission.
 4. **Neatlogs scope:** the seven-span readback covers the instrumented submission/reflection workflow, not every AO worker or fleet span.
 5. **Supermemory:** planned, not integrated or read-back verified. Local Forge files and the ledger are authoritative.
-6. **Deployment:** the static evidence website is deployed on Vercel; Forge's runtime/control plane remains local-first. No unattended generated-app deploy, Android/APK store publication, or hosted multi-tenant Forge service is claimed.
+6. **Deployment:** the static Forge product/docs/support website is deployed on Vercel; Forge's runtime/control plane remains local-first. No unattended generated-app deploy, Android/APK store publication, or hosted multi-tenant Forge service is claimed.
 7. **Metrics:** no cost, token, speed, or percentage improvement is reported unless the underlying run observed it. The current evidence is a bounded pass/fail transition, not a statistical evaluation.
 
 ## Claims we make—and do not make

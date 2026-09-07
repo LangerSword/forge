@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 620" role="img" aria-labelledby="title desc">
+  <title id="title">Forge learning loop</title>
+  <desc id="desc">A static product illustration showing a goal moving through an AO execution plane, an independent verifier, a reflection candidate, and an evidence ledger.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#18201a"/>
+      <stop offset="1" stop-color="#0d110e"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect width="920" height="620" rx="18" fill="url(#bg)"/>
+  <path d="M38 92H882M38 560H882" stroke="#2d3a30"/>
+  <text x="42" y="58" fill="#9ee3ae" font-family="monospace" font-size="13" letter-spacing="2">FORGE / LEARNING LOOP</text>
+  <text x="878" y="58" text-anchor="end" fill="#708072" font-family="monospace" font-size="11">PRODUCT MODEL · STATIC</text>
+
+  <g filter="url(#shadow)">
+    <rect x="62" y="150" width="178" height="112" rx="10" fill="#202b23" stroke="#3c5944"/>
+    <rect x="272" y="150" width="220" height="112" rx="10" fill="#202b23" stroke="#3c5944"/>
+    <rect x="524" y="150" width="158" height="112" rx="10" fill="#202b23" stroke="#3c5944"/>
+    <rect x="714" y="150" width="144" height="112" rx="10" fill="#202b23" stroke="#3c5944"/>
+  </g>
+  <g fill="#eaf3e8" font-family="system-ui, sans-serif">
+    <text x="84" y="184" font-size="12" fill="#8ea695">01 / INPUT</text>
+    <text x="84" y="218" font-size="20" font-weight="600">Goal</text>
+    <text x="84" y="241" font-size="12" fill="#c0cfc1">repo · tools · budget</text>
+    <text x="294" y="184" font-size="12" fill="#8ea695">02 / EXECUTE</text>
+    <text x="294" y="218" font-size="20" font-weight="600">AO + workers</text>
+    <text x="294" y="241" font-size="12" fill="#c0cfc1">worktree · harness · session</text>
+    <text x="546" y="184" font-size="12" fill="#8ea695">03 / CHECK</text>
+    <text x="546" y="218" font-size="20" font-weight="600">Verify</text>
+    <text x="546" y="241" font-size="12" fill="#c0cfc1">artifact · tests · verdict</text>
+    <text x="736" y="184" font-size="12" fill="#8ea695">04 / REFLECT</text>
+    <text x="736" y="218" font-size="20" font-weight="600">Learn</text>
+    <text x="736" y="241" font-size="12" fill="#c0cfc1">candidate · gate · record</text>
+  </g>
+  <g fill="none" stroke="#a8e6b8" stroke-width="2">
+    <path d="M240 206h32"/><path d="m264 196 10 10-10 10"/>
+    <path d="M492 206h32"/><path d="m516 196 10 10-10 10"/>
+    <path d="M682 206h32"/><path d="m706 196 10 10-10 10"/>
+  </g>
+
+  <path d="M786 286v106H136V286" fill="none" stroke="#49644e" stroke-dasharray="6 8"/>
+  <circle cx="786" cy="286" r="5" fill="#edc879"/>
+  <circle cx="136" cy="286" r="5" fill="#a8e6b8"/>
+
+  <rect x="62" y="408" width="796" height="96" rx="10" fill="#101612" stroke="#2d3a30"/>
+  <text x="88" y="441" fill="#7f9182" font-family="monospace" font-size="12" letter-spacing="1">EVIDENCE LEDGER</text>
+  <text x="88" y="474" fill="#eaf3e8" font-family="monospace" font-size="15">goal → baseline → repair → verdict → candidate skill</text>
+  <text x="824" y="474" text-anchor="end" fill="#a8e6b8" font-family="monospace" font-size="12">persisted</text>
+
+  <text x="62" y="572" fill="#718173" font-family="system-ui, sans-serif" font-size="12">Forge does not count a worker message as success without an artifact and an independent check.</text>
+</svg>

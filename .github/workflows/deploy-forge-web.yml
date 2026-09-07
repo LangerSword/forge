@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - "web/**"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/build-web.js"
+      - "vercel.json"
       - ".github/workflows/deploy-forge-web.yml"
   workflow_dispatch:
 
@@ -44,6 +48,13 @@ jobs:
           test -f dist/index.html
           test -f dist/styles.css
           test -f dist/app.js
+          test -f dist/docs/index.html
+          test -f dist/docs/installation.html
+          test -f dist/docs/architecture.html
+          test -f dist/docs/cli.html
+          test -f dist/support/index.html
+          test -f dist/assets/forge-loop.svg
+          test -f dist/assets/c0-evidence.svg
           node --check app.js
 
       - name: Check Vercel credentials
