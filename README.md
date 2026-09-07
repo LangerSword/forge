@@ -124,7 +124,7 @@ For generated web apps, the delivery path is explicit:
 build → verify → preview → human approval → deploy → smoke test → URL
 ```
 
-The Forge product site is packaged as `@llangersword/forge@3.1.0` and is deployed
+The Forge product site is packaged as `@llangersword/forge@3.1.1` and is deployed
 to Vercel at [web-rust-three-63.vercel.app](https://web-rust-three-63.vercel.app/).
 It is a static product/docs/support site, not a live AO tracker or hosted Forge
 backend. The public npm package installs the `forge` executable:
