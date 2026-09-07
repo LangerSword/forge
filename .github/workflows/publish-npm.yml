@@ -44,5 +44,12 @@ jobs:
           test -f public/styles.css
           test -f public/app.js
 
+      - name: Check npm token configured
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: test -n "$NODE_AUTH_TOKEN"
+
       - name: Publish to npm with provenance
         run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

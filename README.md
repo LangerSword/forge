@@ -125,11 +125,12 @@ forge --port 4173
 ```
 
 The npm package is published from `.github/workflows/publish-npm.yml` on a `v*`
-tag or by manual workflow dispatch. The workflow uses npm Trusted Publishing
-(OIDC) and provenance; configure the `forge` package's trusted publisher for
-`LangerSword/forge` and `publish-npm.yml` once on npmjs.com. The package does
-not connect to a live Forge backend. Android/APK and store deployment are later
-adapters, not part of the core Track 1 learning claim.
+tag or by manual workflow dispatch. Add an npm granular access token with write
+permission for `forge` as the GitHub Actions secret `NPM_TOKEN`; the workflow
+passes it through `NODE_AUTH_TOKEN` without exposing it in logs. Provenance is
+also enabled through GitHub's OIDC permission. The package does not connect to a
+live Forge backend. Android/APK and store deployment are later adapters, not
+part of the core Track 1 learning claim.
 No generated app deploys automatically without an approval event.
 
 Full runbook: `SPEC.md` §10 and §15. AO must be running (`ao status`); Forge drives
