@@ -20,3 +20,4 @@ dist/
 recording.mkv
 .vercel
 .env*
+.worktrees/

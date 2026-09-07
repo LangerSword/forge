@@ -19,6 +19,36 @@
     });
   }
 
+  document.querySelectorAll("[data-demo-state]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const demo = document.querySelector("[data-static-demo]");
+      if (!demo) return;
+      const state = button.dataset.demoState || "baseline";
+      const copy = {
+        baseline: { label: "baseline / failed", title: "Frozen verifier found the break.", result: "EXIT 1", detail: "4 frozen checks failed", live: "baseline evidence" },
+        repair: { label: "repair / bounded", title: "One repair, inside the budget.", result: "1 ATTEMPT", detail: "c0_target.py changed", live: "bounded recovery" },
+        verdict: { label: "verdict / observed", title: "The artifact earned a result.", result: "EXIT 0", detail: "4 frozen checks passed", live: "verifier-backed result" },
+      }[state] || null;
+      if (!copy) return;
+      demo.dataset.state = state;
+      demo.setAttribute("aria-labelledby", button.id);
+      button.parentElement?.querySelectorAll("[data-demo-state]").forEach((tab) => {
+        const active = tab === button;
+        tab.classList.toggle("is-active", active);
+        tab.setAttribute("aria-selected", String(active));
+      });
+      const setText = (selector, value) => {
+        const node = demo.querySelector(selector);
+        if (node) node.textContent = value;
+      };
+      setText("[data-demo-label]", copy.label);
+      setText("[data-demo-title]", copy.title);
+      setText("[data-demo-result]", copy.result);
+      setText("[data-demo-detail]", copy.detail);
+      setText("[data-demo-live]", copy.live);
+    });
+  });
+
   document.querySelectorAll("[data-copy]").forEach((button) => {
     const original = button.textContent;
     button.addEventListener("click", async () => {

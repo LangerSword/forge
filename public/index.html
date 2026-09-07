@@ -142,6 +142,32 @@
       </div>
     </section>
 
+    <section class="section-pad evidence-demo-section" id="proof-demo">
+      <div class="container evidence-demo-grid">
+        <div class="evidence-demo-copy">
+          <p class="section-kicker">04 / local proof demo</p>
+          <h2>Read the <span class="ink-underline">change.</span></h2>
+          <p>This is a small local illustration of the evidence contract. Switch states to see the same artifact move from failure to bounded repair to a verifier-backed result. It does not poll AO or represent a live run.</p>
+          <div class="evidence-tabs" role="tablist" aria-label="Static evidence states">
+            <button class="ink-tab is-active" id="proof-tab-baseline" type="button" role="tab" aria-selected="true" aria-controls="proof-state-panel" data-demo-state="baseline"><span>01</span> baseline</button>
+            <button class="ink-tab" id="proof-tab-repair" type="button" role="tab" aria-selected="false" aria-controls="proof-state-panel" data-demo-state="repair"><span>02</span> repair</button>
+            <button class="ink-tab" id="proof-tab-verdict" type="button" role="tab" aria-selected="false" aria-controls="proof-state-panel" data-demo-state="verdict"><span>03</span> verdict</button>
+          </div>
+          <p class="ink-caption"><span class="ink-check" aria-hidden="true">✓</span> local illustration · no backend · no polling</p>
+        </div>
+        <div class="evidence-demo" id="proof-state-panel" role="tabpanel" tabindex="0" aria-labelledby="proof-tab-baseline" data-static-demo data-state="baseline" aria-live="polite">
+          <div class="demo-topline"><span class="demo-tape">FORGE / LOCAL ARTIFACT</span><span class="demo-state" data-demo-label>baseline / failed</span></div>
+          <div class="demo-paper">
+            <div class="demo-hand-label" data-demo-title>Frozen verifier found the break.</div>
+            <div class="demo-code-lines" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+            <div class="demo-result"><strong data-demo-result>EXIT 1</strong><span data-demo-detail>4 frozen checks failed</span></div>
+            <svg class="demo-ink-arrow" viewBox="0 0 180 90" aria-hidden="true"><path d="M8 53 C52 12 106 11 165 34"/><path d="M146 20 L166 34 L144 45"/></svg>
+          </div>
+          <div class="demo-bottomline"><span data-demo-live>baseline evidence</span><span>static / illustrative</span></div>
+        </div>
+      </div>
+    </section>
+
     <section class="section-pad boundary-section">
       <div class="container boundary-layout">
         <div>

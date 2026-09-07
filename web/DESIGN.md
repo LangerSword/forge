@@ -9,6 +9,8 @@
 - `https://opencode.ai/` and `https://opencode.ai/docs` — took the terminal-native code panel, concise capability list, open-source framing, and install/configure/initialize progression.
 - Local `omh design data --kind palette --context dev-tool`, `--kind font --context docs`, and `--kind ux --context docs` — selected layered dark surfaces, readable sans body text, mono technical labels, labelled/copyable code, and constrained reading measure.
 - Existing Forge site capture — retained the evidence-first voice and green signal color, but removed dashboard-like status chrome from the public entry point.
+- `https://raw.githubusercontent.com/NousResearch/hermes-agent/main/website/package.json` and README — verified the official docs site uses Docusaurus 3.10.2 + React 19 and static output; Forge keeps its own dependency-free package.
+- `https://drawably.dev/`, `https://github.com/Danilaa1/drawably`, and the public README/source — took the principle of native controls plus aria-hidden sketch decoration, seeded roughness, stateful controls, and reduced-motion freezing; no Drawably source, assets, wordmark, or exact shapes are copied.
 
 ## 1. Atmosphere & identity
 
