@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Forge documentation: install the local-first learning layer, understand the evidence model, and run the bounded submission loop.">
   <title>Docs — Forge</title>
+  <script src="/theme-init.js"></script>
+  <link rel="stylesheet" href="/vendor/drawably/style.css">
   <link rel="stylesheet" href="/styles.css">
   <script src="/app.js" defer></script>
+  <script type="module" src="/drawably-ink.mjs"></script>
 </head>
 <body data-page="docs">
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -15,6 +18,13 @@
       <a class="brand" href="/" aria-label="Forge home"><span class="brand-mark" aria-hidden="true"><i></i><b></b></span><span class="brand-word">forge</span><span class="brand-sub">agent learning layer</span></a>
       <nav class="primary-nav" aria-label="Primary navigation"><a href="/">Product</a><a class="is-active" href="/docs/">Docs</a><a href="/support/">Support</a><a href="https://github.com/LangerSword/forge" target="_blank" rel="noreferrer">GitHub ↗</a></nav>
       <a class="button button--small button--accent nav-cta" href="/docs/installation.html">Install Forge <span aria-hidden="true">↗</span></a>
+      <div class="theme-picker" data-theme-picker>
+        <span class="theme-label theme-label--light">light</span>
+        <label class="theme-toggle-control" data-theme-control>
+          <input type="checkbox" data-theme-toggle role="switch" aria-label="Switch to dark theme">
+        </label>
+        <span class="theme-label theme-label--dark">dark</span>
+      </div>
       <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open navigation"><span></span><span></span></button>
     </div>
     <div class="mobile-menu" id="mobile-menu" hidden><nav class="container" aria-label="Mobile navigation"><a href="/">Product <span>01</span></a><a class="is-active" href="/docs/">Docs <span>02</span></a><a href="/support/">Support <span>03</span></a><a href="https://github.com/LangerSword/forge" target="_blank" rel="noreferrer">GitHub <span>↗</span></a><a class="mobile-install" href="/docs/installation.html">Install Forge <span>↗</span></a></nav></div>

@@ -6,8 +6,11 @@
   <meta name="description" content="Forge is an evidence-gated learning layer for agent fleets: verify outcomes, reflect on failures, and promote only what survives the gate.">
   <meta name="theme-color" content="#0b0d0c">
   <title>Forge — the learning layer for agent fleets</title>
+  <script src="/theme-init.js"></script>
+  <link rel="stylesheet" href="/vendor/drawably/style.css">
   <link rel="stylesheet" href="/styles.css">
   <script src="/app.js" defer></script>
+  <script type="module" src="/drawably-ink.mjs"></script>
 </head>
 <body data-page="home">
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -25,6 +28,13 @@
         <a href="https://github.com/LangerSword/forge" target="_blank" rel="noreferrer">GitHub ↗</a>
       </nav>
       <a class="button button--small button--accent nav-cta" href="/docs/installation.html">Install Forge <span aria-hidden="true">↗</span></a>
+      <div class="theme-picker" data-theme-picker>
+        <span class="theme-label theme-label--light">light</span>
+        <label class="theme-toggle-control" data-theme-control>
+          <input type="checkbox" data-theme-toggle role="switch" aria-label="Switch to dark theme">
+        </label>
+        <span class="theme-label theme-label--dark">dark</span>
+      </div>
       <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open navigation"><span></span><span></span></button>
     </div>
     <div class="mobile-menu" id="mobile-menu" hidden>

@@ -7,6 +7,20 @@ const root = path.resolve(__dirname, '..');
 const dist = path.join(root, 'dist');
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const ignored = new Set(['node_modules', 'dist', '.git', '.vercel', '.gitignore', 'package.json', 'package-lock.json', 'README.md', 'DESIGN.md', 'server.js', 'vercel.json', 'scripts']);
+const drawablySource = path.join(root, 'node_modules', 'drawably');
+const drawablyFiles = ['dist/index.js', 'dist/controls.js', 'dist/rough.js', 'dist/prng.js', 'style.css', 'LICENSE'];
+
+function copyDrawably(targetRoot) {
+  const target = path.join(targetRoot, 'vendor', 'drawably');
+  fs.mkdirSync(target, { recursive: true });
+  if (!fs.existsSync(drawablySource)) throw new Error('drawably is missing; run npm ci before building');
+  for (const relative of drawablyFiles) {
+    const source = path.join(drawablySource, relative);
+    if (!fs.existsSync(source)) throw new Error(`drawably asset is missing: ${relative}`);
+    fs.copyFileSync(source, path.join(target, path.basename(relative)));
+  }
+}
+
 
 function collect(directory, prefix = '') {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -24,7 +38,7 @@ if (!assets.includes('index.html') || !assets.includes('styles.css') || !assets.
 }
 
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-for (const reference of ['styles.css', 'app.js']) {
+for (const reference of ['styles.css', 'app.js', 'theme-init.js', 'vendor/drawably/style.css', 'drawably-ink.mjs']) {
   if (!html.includes(reference)) throw new Error(`index.html does not reference ${reference}`);
 }
 
@@ -36,7 +50,8 @@ for (const relative of assets) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(source, target);
 }
+copyDrawably(dist);
 
 console.log(`Forge build: ${packageJson.name}@${packageJson.version}`);
-console.log(`Forge build: copied ${assets.length} site files to dist/`);
+console.log(`Forge build: copied ${assets.length} site files plus Drawably runtime to dist/`);
 console.log('Forge build: entrypoint index.html verified');

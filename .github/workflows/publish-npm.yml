@@ -30,7 +30,7 @@ jobs:
 
       - name: Verify package metadata
         run: |
-          test "$(node -p "require('./package.json').name")" = "forge"
+          test "$(node -p "require('./package.json').name")" = "@langersword/forge"
           test "$(node -p "require('./package.json').version")" != "0.1.0"
           node --check bin/forge-evidence-site.js
 

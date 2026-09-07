@@ -1,8 +1,6 @@
 # Forge product site
 
-A dependency-free static product, documentation, and support site for Forge. It explains the evidence-gated learning layer, shows the real C0 artifact shape, and links visitors to local installation and repository-backed documentation.
-
-The public site is intentionally **not** a live AO tracker. It does not connect to a Forge backend or imply current worker state.
+A static product, documentation, and support site for Forge with one small runtime dependency: [`drawably`](https://www.npmjs.com/package/drawably) provides accessible native-control SVG chrome and reduced-motion-aware ink effects for the local proof surface. The site remains a dependency-light static package; it does not connect to a Forge backend or live AO tracker.
 
 ## Scripts
 
@@ -14,7 +12,7 @@ npm run preview  # build, then serve on port 4173
 npm pack --dry-run
 ```
 
-No runtime dependency installation is required beyond Node.js 18 or newer.
+No runtime service is required beyond Node.js 18 or newer. The build vendors the browser-compatible Drawably ESM modules and stylesheet into the static output; React is not installed or used.
 
 ## Routes
 
@@ -54,6 +52,7 @@ The same package can deploy to Netlify, Cloudflare Pages, GitHub Pages, or anoth
 
 - Build command: `npm run build`
 - Publish/output directory: `dist`
+- Drawably browser runtime is copied into `dist/vendor/drawably/` during the build.
 
 For a Node host, run `npm run build` during release and start with `npm start`. The server accepts `HOST` and `PORT` environment variables.
 

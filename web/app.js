@@ -1,6 +1,60 @@
 (() => {
   "use strict";
 
+  const inkPalettes = {
+    light: {
+      ink: "#1f2922",
+      paper: "#fffdf7",
+      green: "#176b45",
+      pencil: "#8f9589",
+      amber: "#a36f17",
+      red: "#b64038",
+      blue: "#396c9e",
+    },
+    dark: {
+      ink: "#edf0e6",
+      paper: "#282c25",
+      green: "#8dd3a5",
+      pencil: "#788174",
+      amber: "#d4a33f",
+      red: "#e4867d",
+      blue: "#8db4da",
+    },
+  };
+
+  const refreshDrawablyTheme = () => {
+    const palette = inkPalettes[document.documentElement.dataset.theme === "dark" ? "dark" : "light"];
+    document.querySelectorAll(".drawably-host").forEach((element) => {
+      const tone = element.dataset.forgeInk || "ink";
+      const color = palette[tone] || palette.ink;
+      element.style.setProperty("--drawably-stroke", color);
+      element.style.setProperty("--drawably-ink", color);
+      element.style.setProperty("--drawably-fill", tone === "green" ? (document.documentElement.dataset.theme === "dark" ? "#314c38" : "#dcebdc") : palette.paper);
+      element.style.setProperty("--drawably-paper", palette.paper);
+    });
+  };
+  window.forgeRefreshInk = refreshDrawablyTheme;
+
+  const themeControls = [...document.querySelectorAll("[data-theme-toggle]")];
+  const setTheme = (theme, persist = true) => {
+    const next = theme === "dark" ? "dark" : "light";
+    document.documentElement.dataset.theme = next;
+    document.documentElement.style.colorScheme = next;
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.setAttribute("content", next === "dark" ? "#1d211d" : "#f7f2e8");
+    themeControls.forEach((control) => {
+      control.checked = next === "dark";
+      control.setAttribute("aria-checked", String(control.checked));
+      control.setAttribute("aria-label", control.checked ? "Switch to light theme" : "Switch to dark theme");
+    });
+    if (persist) {
+      try { localStorage.setItem("forge-theme", next); } catch { /* storage may be unavailable */ }
+    }
+    refreshDrawablyTheme();
+  };
+  themeControls.forEach((control) => control.addEventListener("change", () => setTheme(control.checked ? "dark" : "light")));
+  setTheme(document.documentElement.dataset.theme || "light", false);
+
   const menuButton = document.querySelector(".menu-toggle");
   const mobileMenu = document.querySelector("#mobile-menu");
 

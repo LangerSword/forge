@@ -1,5 +1,5 @@
 {
-  "name": "forge",
+  "name": "@langersword/forge",
   "version": "3.1.0",
   "description": "The Forge product, documentation, and support site for agent fleets.",
   "type": "commonjs",
@@ -41,5 +41,11 @@
     "observability",
     "static-site",
     "deployment"
-  ]
+  ],
+  "dependencies": {
+    "drawably": "^0.3.10"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -29,7 +29,7 @@
 - The official Hermes website package is Docusaurus `3.10.2` with React `19.2.7`, `@mdx-js/react`, Mermaid support, and a static `docusaurus build` output according to the repository's `website/package.json` and README.
 - The deployed landing page is served through a Next/Vercel-style production bundle with static chunks and Turbopack markers; this is deployment output, not the source-site framework claim.
 - The HTML preloads custom font assets including `CourierPrime`, `RulesVariable`, and `Sigurd`.
-- This distinction matters: Forge should borrow the product sequencing and docs structure, not copy the Hermes implementation stack into its dependency-free static package.
+- This distinction matters: Forge should borrow the product sequencing and docs structure, not copy the Hermes implementation stack into its dependency-light static package.
 
 ### Design implications for Forge
 
@@ -56,11 +56,11 @@
 - Add a small original ink layer to Forge buttons, evidence annotations, and one local product artifact.
 - Convey state with text and semantics first; roughness is a visual reinforcement, not the only signal.
 - Keep the effect sparse so the product remains technical and readable.
-- Create original Forge marks, stroke shapes, colors, and labels rather than copying Drawably source, assets, wordmark, or exact layout.
+- Create original Forge marks, stroke shapes, colors, and labels. The site uses the published `drawably@0.3.10` browser runtime, but does not copy the Drawably site, wordmark, or exact layout.
 
 ## Forge-specific constraints
 
-- Current website source is dependency-free static HTML/CSS/JS under `web/`.
+- Current website source is static HTML/CSS/JS under `web/`, with the published Drawably runtime installed as the sole website dependency and vendored into build output.
 - Existing routes must remain available: `/`, `/docs/`, `/docs/installation.html`, `/docs/architecture.html`, `/docs/cli.html`, `/support/`.
 - Vercel output is generated into root `public/` by `scripts/build-web.js`.
 - The public site must not imply live AO sessions, live worker counts, hosted Forge state, cross-harness transfer, or Supermemory integration.
