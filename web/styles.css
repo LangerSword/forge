@@ -111,6 +111,7 @@ em { color: var(--green); font-family: Georgia, "Times New Roman", serif; font-w
 .demo-result strong { color: #9d4d45; font-size: 21px; letter-spacing: -.04em; }.demo-result span { color: #526254; font-size: 10px; }
 .demo-ink-arrow { position: absolute; right: 17px; bottom: 46px; width: 150px; height: 76px; overflow: visible; fill: none; stroke: #5b8f68; stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; opacity: .9; }
 .demo-bottomline { min-height: 49px; }.demo-bottomline span:first-child { color: var(--green); }
+.evidence-demo [data-demo-detail] { overflow-wrap: anywhere; }
 .evidence-demo[data-state="repair"] .demo-state { color: var(--amber); }.evidence-demo[data-state="repair"] .demo-paper { background: #ece8d8; }.evidence-demo[data-state="repair"] .demo-result strong { color: #a6752e; }.evidence-demo[data-state="repair"] .demo-hand-label::after { position: absolute; right: -19px; bottom: -12px; width: 96px; height: 17px; border-bottom: 3px solid #b38438; border-radius: 50%; content: ""; transform: rotate(-6deg); }
 .evidence-demo[data-state="verdict"] .demo-state { color: var(--green); }.evidence-demo[data-state="verdict"] .demo-paper { background: #e1eee2; }.evidence-demo[data-state="verdict"] .demo-result strong { color: #39784d; }.evidence-demo[data-state="verdict"] .demo-ink-arrow { stroke: #39784d; }.evidence-demo[data-state="verdict"]::before { position: absolute; top: 52px; right: 26px; width: 37px; height: 20px; border-bottom: 4px solid #39784d; border-left: 4px solid #39784d; content: ""; transform: rotate(-45deg); }
 
@@ -330,6 +331,7 @@ details p { max-width: 650px; margin: 0 0 19px; color: var(--muted); font-size: 
   .hero-visual { max-width: 700px; margin-left: auto; }
   .artifact-copy { max-width: 650px; }
   .evidence-demo { max-width: 700px; margin-inline: auto; }
+  .evidence-demo-grid { gap: 38px; }
   .docs-layout { grid-template-columns: 190px minmax(0, 1fr); gap: 48px; }
   .support-grid { grid-template-columns: 1fr; }
   .support-card > p { min-height: auto; }
@@ -350,6 +352,13 @@ details p { max-width: 650px; margin: 0 0 19px; color: var(--muted); font-size: 
   .mobile-menu a span { color: var(--quiet); font-family: var(--mono); font-size: 10px; }
   .mobile-menu a.is-active { color: var(--ink); }
   .mobile-menu .mobile-install { margin-top: 10px; padding: 11px 13px; color: var(--canvas); background: var(--green); border: 0; border-radius: 5px; font-weight: 600; }
+  .evidence-demo-grid { gap: 30px; }
+  .evidence-tabs { gap: 6px; margin-top: 23px; }
+  .ink-tab { flex: 1 1 0; justify-content: center; min-width: 0; padding-inline: 7px; }
+  .demo-paper { min-height: 245px; padding: 26px 21px; }
+  .demo-hand-label { max-width: 72%; font-size: clamp(19px, 5.2vw, 26px); }
+  .demo-code-lines { width: 75%; margin-top: 29px; }
+  .demo-ink-arrow { right: 9px; bottom: 45px; width: 125px; }
   .proof-bar-inner { align-items: flex-start; flex-direction: column; justify-content: center; gap: 9px; padding-top: 15px; padding-bottom: 15px; }
   .proof-bar p { font-size: 13px; }
   .proof-bar a { font-size: 12px; }
@@ -380,6 +389,13 @@ details p { max-width: 650px; margin: 0 0 19px; color: var(--muted); font-size: 
   .hero-facts { display: grid; gap: 9px; margin-top: 31px; }
   .visual-window--hero, .visual-window--artifact { transform: none; }
   .evidence-demo { transform: none; }
+  .demo-topline, .demo-bottomline { padding-inline: 11px; font-size: 8px; }
+  .demo-paper { min-height: 224px; margin-inline: 8px; padding: 22px 16px; }
+  .demo-hand-label { max-width: 78%; font-size: 20px; }
+  .demo-code-lines { gap: 9px; width: 70%; margin-top: 25px; }
+  .demo-result { flex-wrap: wrap; gap: 5px 10px; margin-top: 27px; padding-top: 13px; }
+  .demo-result strong { font-size: 18px; }
+  .demo-ink-arrow { right: 3px; bottom: 41px; width: 105px; height: 68px; }
   .window-bar { font-size: 9px; }
   .window-status { display: none; }
   .visual-note { align-items: flex-start; flex-direction: column; justify-content: center; gap: 4px; min-height: 52px; }
@@ -399,5 +415,5 @@ details p { max-width: 650px; margin: 0 0 19px; color: var(--muted); font-size: 
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
-  .evidence-demo, .demo-paper, .ink-tab { transform: none !important; }
+  .evidence-demo, .demo-paper, .ink-tab, .button:hover, .resource-link:hover { transform: none !important; }
 }

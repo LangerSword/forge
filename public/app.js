@@ -5,22 +5,31 @@
   const mobileMenu = document.querySelector("#mobile-menu");
 
   if (menuButton && mobileMenu) {
+    const setMenu = (open) => {
+      menuButton.setAttribute("aria-expanded", String(open));
+      menuButton.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
+      mobileMenu.hidden = !open;
+    };
     menuButton.addEventListener("click", () => {
       const isOpen = menuButton.getAttribute("aria-expanded") === "true";
-      menuButton.setAttribute("aria-expanded", String(!isOpen));
-      mobileMenu.hidden = isOpen;
+      setMenu(!isOpen);
     });
 
     mobileMenu.querySelectorAll("a").forEach((link) => {
       link.addEventListener("click", () => {
-        menuButton.setAttribute("aria-expanded", "false");
-        mobileMenu.hidden = true;
+        setMenu(false);
       });
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && menuButton.getAttribute("aria-expanded") === "true") {
+        setMenu(false);
+        menuButton.focus();
+      }
     });
   }
 
-  document.querySelectorAll("[data-demo-state]").forEach((button) => {
-    button.addEventListener("click", () => {
+  const demoTabs = [...document.querySelectorAll("[data-demo-state]")];
+  const selectDemoTab = (button) => {
       const demo = document.querySelector("[data-static-demo]");
       if (!demo) return;
       const state = button.dataset.demoState || "baseline";
@@ -36,6 +45,7 @@
         const active = tab === button;
         tab.classList.toggle("is-active", active);
         tab.setAttribute("aria-selected", String(active));
+        tab.tabIndex = active ? 0 : -1;
       });
       const setText = (selector, value) => {
         const node = demo.querySelector(selector);
@@ -46,6 +56,19 @@
       setText("[data-demo-result]", copy.result);
       setText("[data-demo-detail]", copy.detail);
       setText("[data-demo-live]", copy.live);
+  };
+
+  demoTabs.forEach((button, index) => {
+    button.tabIndex = button.classList.contains("is-active") ? 0 : -1;
+    button.addEventListener("click", () => {
+      selectDemoTab(button);
+    });
+    button.addEventListener("keydown", (event) => {
+      if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const next = event.key === "Home" ? 0 : event.key === "End" ? demoTabs.length - 1 : (index + (["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1) + demoTabs.length) % demoTabs.length;
+      demoTabs[next].focus();
+      selectDemoTab(demoTabs[next]);
     });
   });
 
