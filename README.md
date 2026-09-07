@@ -115,34 +115,27 @@ For generated web apps, the delivery path is explicit:
 build → verify → preview → human approval → deploy → smoke test → URL
 ```
 
-The Forge product site is packaged at the repository root as
-`@langersword/forge@3.1.0` and is deployed to Vercel at
-[web-rust-three-63.vercel.app](https://web-rust-three-63.vercel.app/). It is a
-static product/docs/support site, not a live AO tracker or hosted Forge backend.
-The package installs the `forge` executable:
+The Forge product site is packaged as `@langersword/forge@3.1.0` and is deployed
+to Vercel at [web-rust-three-63.vercel.app](https://web-rust-three-63.vercel.app/).
+It is a static product/docs/support site, not a live AO tracker or hosted Forge
+backend. The package installs the `forge` executable from GitHub Packages:
 
 ```bash
+npm config set @langersword:registry https://npm.pkg.github.com
 npm install @langersword/forge
 npx forge --port 4173
 ```
 
-The package is published from `.github/workflows/publish-npm.yml` on a `v*` tag
-or by manual workflow dispatch. Because this is a new scoped package, publish
-`@langersword/forge@3.1.0` once from an interactive npm session first. Then add
-npm Trusted Publishing for future CI releases:
+Authenticate to GitHub Packages with a GitHub token that has `read:packages`:
 
-```text
-Provider: GitHub Actions
-User/organization: LangerSword
-Repository: forge
-Workflow filename: publish-npm.yml
-Environment: blank
-Permission: direct npm publish
+```bash
+npm login --scope=@langersword --registry=https://npm.pkg.github.com
 ```
 
-The workflow uses GitHub OIDC and publishes provenance without an npm token. The
-package does not connect to a live Forge backend. Android/APK and store
-deployment are later adapters, not part of the core Track 1 learning claim.
+The package is published by `.github/workflows/publish-npm.yml` on a `v*` tag or
+manual dispatch using the repository's built-in `GITHUB_TOKEN` with
+`packages: write`. The unscoped npmjs.com package `forge` is unrelated and is
+not modified.
 No generated app deploys automatically without an approval event.
 
 Full runbook: `SPEC.md` §10 and §15. AO must be running (`ao status`); Forge drives

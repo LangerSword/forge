@@ -36,9 +36,13 @@ Output directory: public
 Production URL: https://web-rust-three-63.vercel.app
 ```
 
-The repository workflow is `.github/workflows/deploy-forge-web.yml`. It runs on changes to the website or root deployment contract, and it verifies the package before optional Vercel deployment.
+The package is also the source for the repository's GitHub Packages release. The
+publish workflow uses the repository `GITHUB_TOKEN` with `packages: write`:
 
-Required GitHub Actions secrets:
+```text
+registry: https://npm.pkg.github.com
+package: @langersword/forge
+```
 
 ```text
 VERCEL_ORG_ID

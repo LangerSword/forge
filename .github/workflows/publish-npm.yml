@@ -1,4 +1,4 @@
-name: Publish Forge to npm
+name: Publish Forge to GitHub Packages
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write
+  packages: write
 
 concurrency:
   group: npm-publish-forge
@@ -25,7 +25,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
+          registry-url: https://npm.pkg.github.com
+          scope: '@langersword'
           package-manager-cache: false
 
       - name: Verify package metadata
@@ -35,14 +36,16 @@ jobs:
           node --check bin/forge-evidence-site.js
 
       - name: Install and build
-        run: npm ci && npm run build
+        run: npm ci --registry=https://registry.npmjs.org && npm run build
 
       - name: Run package smoke test
         run: |
-          npm pack --dry-run --access public
+          npm pack --dry-run
           test -f public/index.html
           test -f public/styles.css
           test -f public/app.js
 
-      - name: Publish to npm with provenance
-        run: npm publish --provenance --access public
+      - name: Publish to GitHub Packages
+        run: npm publish --registry=https://npm.pkg.github.com
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
