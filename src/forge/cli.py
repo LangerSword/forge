@@ -21,11 +21,16 @@ logging.getLogger("neatlogs").setLevel(logging.WARNING)
 
 from . import __version__
 from .ao import AOClient
+from .ao_cli import AOCLI
 from .c0_run import run_c0
+from .experiment import LearningExperiment, TaskExecutor
+from .fleet import FleetController, build_bounded_goal_graph
+from .graph import compile_goal_graph, graph_counts
 from .harness_readiness import build_harness_report
 from .openai_provider import OpenAIProvider, ProviderError
 from .submission import run_submission_mvp
 from .ledger import Ledger
+from .schema import GoalSpec
 
 
 DEFAULT_SUPPORTED_HARNESSES = ("opencode", "claude-code", "codex")
@@ -149,12 +154,101 @@ def cmd_dashboard(port: int) -> int:
         server.server_close()
 
 
+def cmd_experiment(experiment_id: str, goal_file: str) -> int:
+    """Run a deterministic learning experiment with a local executor."""
+    try:
+        goal = GoalSpec.model_validate_json(Path(goal_file).read_text())
+    except Exception as exc:
+        print(json.dumps({"schema_version": "forge.experiment.v1", "ok": False,
+                          "error": "invalid_goal", "message": str(exc)}, indent=2))
+        return 1
+    from .evaluation import EvaluationCase
+    ledger = Ledger(root())
+    experiment = LearningExperiment(
+        experiment_id=experiment_id,
+        task_family=experiment_id,
+        goal=goal,
+        train_cases=[EvaluationCase("case-a", "ref-a")],
+        heldout_cases=[EvaluationCase("heldout-1", "ref-h1")],
+        ledger=ledger,
+        baseline_executor=_default_task_executor(),
+        candidate_executor=_default_task_executor(),
+    )
+    result = experiment.run()
+    output = {
+        "schema_version": "forge.experiment.v1", "ok": True,
+        "experiment_id": result.experiment_id,
+        "baseline_count": len(result.baseline_results or []),
+        "learned_count": len(result.learned_results or []),
+        "candidate": result.candidate.skill_id if result.candidate else None,
+        "gate_status": result.gate_verdict.status if result.gate_verdict else None,
+    }
+    if result.comparison:
+        output["comparison"] = {
+            "improved": result.comparison.improved,
+            "regression": result.comparison.regression,
+            "deltas": result.comparison.deltas,
+            "reasons": list(result.comparison.reasons),
+        }
+    print(json.dumps(output, indent=2))
+    return 0
+
+
+def cmd_experiments() -> int:
+    """List completed experiments from the ledger."""
+    ledger = Ledger(root())
+    runs = ledger.list_runs()
+    experiments = [r for r in runs if r.get("run_id", "").startswith("exp-")]
+    print(json.dumps({"schema_version": "forge.experiments.v1", "ok": True,
+                      "count": len(experiments), "experiments": experiments}, indent=2))
+    return 0
+
+
+def cmd_graph(goal_file: str) -> int:
+    """Compile a goal JSON into its typed execution graph and print it."""
+    try:
+        goal = GoalSpec.model_validate_json(Path(goal_file).read_text())
+        graph = compile_goal_graph(goal)
+    except Exception as exc:
+        print(json.dumps({
+            "schema_version": "forge.graph.v1", "ok": False,
+            "error": type(exc).__name__, "message": str(exc)[:500],
+        }, indent=2))
+        return 1
+    print(json.dumps({
+        "schema_version": "forge.graph.v1", "ok": True,
+        "goal": goal.model_dump(),
+        "graph": graph.model_dump(),
+        "counts": graph_counts(graph),
+    }, indent=2, sort_keys=True))
+    return 0
+
+
+def _default_task_executor():
+    class SimpleExecutor:
+        name = "cli-executor"
+        def execute(self, case, *, candidate_id=None):
+            from .schema import RunResult
+            return RunResult(
+                run_id=f"cli-trial-{case.case_id}",
+                goal=case.evidence_ref,
+                condition="C1" if candidate_id else "C0",
+                harness="local", status="passed", checks=[], tools_called=1,
+            )
+    return SimpleExecutor()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="forge")
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("status")
     sub.add_parser("harnesses", help="read-only AO harness readiness JSON")
+    plan = sub.add_parser("plan", help="show the bounded task graph for a goal JSON")
+    plan.add_argument("goal_file")
+    fleet = sub.add_parser("fleet", help="run a bounded Forge fleet through AO")
+    fleet.add_argument("goal_file")
+    fleet.add_argument("--dry-run", action="store_true", help="plan and ledger the fleet without spawning AO")
     c0 = sub.add_parser("run-c0")
     sub.add_parser("openai-smoke")
     submission = sub.add_parser("submission-mvp")
@@ -163,6 +257,13 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("runs")
     run = sub.add_parser("run")
     run.add_argument("run_id")
+    exp = sub.add_parser("experiment", help="run a deterministic learning experiment")
+    exp.add_argument("experiment_id", help="experiment identifier")
+    exp.add_argument("goal_file", help="path to GoalSpec JSON file")
+    exp.add_argument("--trials", type=int, default=3, help="number of trials per condition")
+    sub.add_parser("experiments", help="list completed experiments")
+    graph_cmd = sub.add_parser("graph", help="compile a goal into its typed execution graph")
+    graph_cmd.add_argument("goal_file", help="path to GoalSpec JSON file")
     dash = sub.add_parser("dashboard")
     dash.add_argument("--port", type=int, default=8787)
     args = parser.parse_args(argv)
@@ -170,6 +271,25 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_status()
     if args.command == "harnesses":
         return cmd_harnesses()
+    if args.command in {"plan", "fleet"}:
+        try:
+            goal = GoalSpec.model_validate_json(Path(args.goal_file).read_text())
+            graph = build_bounded_goal_graph(goal)
+            if args.command == "plan":
+                print(json.dumps({"schema_version": "forge.task-graph.v1", "ok": True, "goal": goal.model_dump(), "graph": graph.model_dump()}, indent=2, sort_keys=True))
+                return 0
+            controller = FleetController(
+                root(),
+                runner_factory=lambda request: __import__("forge.ao_runner", fromlist=["AORunner"]).AORunner(
+                    ao_cli=AOCLI(), ao_client=AOClient(), ledger=Ledger(root())
+                ),
+            )
+            report = controller.run(goal, graph, dry_run=args.dry_run)
+            print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
+            return 0 if report.status in {"planned", "passed"} else 1
+        except Exception as exc:
+            print(json.dumps({"schema_version": "forge.fleet.v1", "ok": False, "error": type(exc).__name__, "message": str(exc)[:500]}, indent=2))
+            return 1
     if args.command == "runs":
         print(json.dumps({"schema_version": "1", "command": "runs", "ok": True,
                           "runs": Ledger(root()).list_runs(), "error": None}, indent=2))
@@ -210,6 +330,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if result["final"]["passed"] else 1
     if args.command == "dashboard":
         return cmd_dashboard(args.port)
+    if args.command == "experiment":
+        return cmd_experiment(args.experiment_id, args.goal_file)
+    if args.command == "experiments":
+        return cmd_experiments()
+    if args.command == "graph":
+        return cmd_graph(args.goal_file)
     return 2
 
 

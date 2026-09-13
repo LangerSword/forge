@@ -21,3 +21,6 @@ recording.mkv
 .vercel
 .env*
 .worktrees/
+
+# agent-local working state (plans are mirrored into docs/plans/)
+.hermes/

@@ -20,6 +20,7 @@ class WorkerClassification(StrEnum):
     NO_OP = "no_op"
     LIVENESS_STUCK = "liveness_stuck"
     TERMINATED = "terminated"
+    VERIFICATION_UNAVAILABLE = "verification_unavailable"
 
 
 @dataclass(frozen=True)

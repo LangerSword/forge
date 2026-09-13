@@ -4,9 +4,190 @@ This is the durable human-readable record of important discoveries, setbacks,
 decisions, workarounds, and evidence. It exists for debugging, evaluator
 trust, and the final pitch/demo narrative.
 
+---
+
+## 2026-09-14 — Agent design principles from razorpay-agent vs ZapAI post-mortem
+
+- **Type:** design decision
+- **Status:** committed to spec
+- **Scope:** architecture, agent rules, learning contract
+
+### What happened
+
+Compared our prior razorpay-agent (dual-agent commerce, LinUCB bandit, gated money path, in-memory state, property-fuzzed gate, YC-themed React frontend) against ZapAI by lviffy (WhatsApp-native agentic commerce with real Shopify/Razorpay/WhatsApp integrations, Neon PG, Redis, Gemini 2.5 Flash, 43 tests, 93 commits, full merchant dashboard).
+
+### Evidence
+
+- **razorpay-agent:** 127 commits, real Razorpay order→payment link→paid, 20k gate fuzzed 0 violations, LinUCB bandit, pure CSS zero UI libraries, keyless stub fallback, no persistence, no external webhooks
+- **ZapAI:** 93 commits, 10 Razorpay API modules, Shopify OAuth/catalog sync, WhatsApp Cloud API, Neon PG, Redis locks, 43 passing tests, Next.js 15 dashboard, onboarding wizard, multi-tenant credentials, 8-stage cryptographic audit ledger, RFC 8785, Ed25519
+
+### Interpretation / root cause
+
+razorpay-agent's strength was safety formalism (property-fuzzed gate, clean LLM/money separation, principled bandit). ZapAI's strength was product completeness (real integrations, real persistence, real multi-tenant onboarding, more tests). Neither project did both well. The gap was not conceptual — it was execution: ZapAI connected to real systems while we kept everything in-memory and stubbed.
+
+### Decision or action
+
+Integrated 10 agent design principles into SPEC.md §13 and architecture.md:
+
+1. Real integrations > conceptual elegance
+2. Persistence is non-negotiable
+3. LLM drives reasoning within guardrails
+4. Safety + integrations (not either/or)
+5. Multi-tenant from day one
+6. Frontend is the product
+7. Inventory locking is real
+8. Cryptographic audit trails are compliance infrastructure
+9. Scope = end-to-end journey
+10. Tests cover integration scenarios
+
+Version bumped 0.1.4 → 0.1.5.
+
+### Impact
+
+- **Architecture:** these principles now constrain every future Forge design decision
+- **Evaluation:** any Forge agent or integration work is measured against these tenets
+- **Honesty:** we explicitly recognize where razorpay-agent fell short (persistence, integrations, scope) rather than claiming it was "complete"
+
+### Pitch clip
+
+> "Forge was designed after a head-to-head post-mortem of two Razorpay buildathon entries — ours, which optimized for safety formalism, and ZapAI's, which optimized for integrations. Forge is the synthesis: real connections, real persistence, real safety."
+
 **Rule:** an entry records what actually happened. Hypotheses are labeled as
 hypotheses. Metrics come from observed runs only. Temporary chatter and
 secrets do not belong here.
+
+---
+
+## 2026-09-08 — Hard runtime and live AO boundary audit
+
+- **Type:** milestone / blocker
+- **Status:** observed
+- **Agents/harnesses:** Forge controller, AO daemon, OpenCode, local verifier
+- **Scope:** AO spawn/readback, fleet resume, artifact freshness, liveness, task checkpoints
+
+### What happened
+
+Forge's hard-runtime path was extended beyond the initial fake-backed controller:
+independent verifier authority is mandatory for pass, stale artifacts are rejected
+by content fingerprint, real AO `spawned session <id>` output is parsed, AO Git
+worktrees are discovered from observed `ao/<session>/root` branches, nested AO
+activity timestamps are normalized, successful sessions are cleaned up, fleet
+budgets stop polling, and task attempts persist typed SQLite checkpoints with
+compare-and-set transitions. Candidate learning now has evaluator-owned
+applicability, A/B, and held-out gates plus durable skill verdict records.
+
+Four bounded live AO attempts were made against the healthy local daemon. The
+first two exposed non-atomic spawn output and were reconciled without claiming
+success; later attempts recovered real sessions and worktrees, but OpenCode
+produced no changed files or requested artifact even after one bounded nudge.
+Forge classified the worker as `no_op`, terminated it, and persisted the failure.
+
+### Evidence
+
+- `uv run pytest -q`: `102 passed`
+- live AO health/readiness: `status=ok`, `status=ready`
+- live authorized harness: OpenCode only
+- live session recovery: `forge-11` / `forge-12` observed with isolated worktrees
+- final live run: `fleet-c10318abd7:goal`
+- final task verdict: `status=failed`, `classification=no_op`, `reason=no changed files after one nudge`
+- final AO readback: session `forge-12`, `status=terminated`, `activity=exited`
+- final checkpoint: attempt `1`, `state=failed`, `session_id=forge-12`, `verification_passed=false`, no artifact digest
+
+### Interpretation / root cause
+
+The controller/runtime boundary is now evidence-preserving and avoids duplicate
+workers, false passes, stale artifacts, and leaked sessions. The remaining live
+failure is downstream: AO/OpenCode creates and runs the worker session but does
+not produce the bounded artifact in this environment. This is an observed
+worker liveness/no-op blocker, not evidence that Forge completed the task.
+
+### Decision or action
+
+Do not add automatic retries or broaden permissions. Keep the live blocker
+explicit. The next integration step is to inspect AO/OpenCode's own session
+prompt/ACP path or run one manually approved minimal worker task through the AO
+surface, then repeat the same artifact/verifier contract. No cross-harness claim
+or autonomous-completion claim is made.
+
+### Impact
+
+- **Runtime:** Forge can now safely own a fleet lifecycle around real AO sessions,
+  including recovery and cleanup, even when the worker fails.
+- **Learning:** reflection/evaluation remains downstream of verified outcomes;
+  this failed live run must not generate a validated skill.
+- **Product claim:** the agent/controller implementation is real and tested;
+  end-to-end AO artifact-producing success remains unverified.
+
+### Pitch clip
+
+> "Forge does not turn a live AO session into a success badge. It records the
+> session, finds the real worktree, verifies a fresh artifact, nudges once, and
+> kills a no-op worker when the evidence never arrives."
+
+---
+
+## 2026-09-07 — Forge agent/controller runtime slice
+
+- **Type:** milestone
+- **Status:** observed
+- **Agents/harnesses:** local Forge controller, fake AO runner contracts, pytest
+- **Scope:** `src/forge/fleet.py`, `src/forge/schema.py`, `src/forge/ledger.py`, `src/forge/cli.py`
+
+### What happened
+
+Forge gained its first bounded agent-runtime slice above the AO worker plane.
+The controller accepts a strict `GoalSpec`, validates a dependency-aware
+`TaskGraph`, assembles a fenced task-scoped `ContextPackage`, schedules
+independent ready tasks up to `max_parallel`, records task verdicts in the
+SQLite ledger, blocks dependent tasks after failure, and invokes a candidate
+learning hook only after the run reaches a terminal state. `forge plan` and
+`forge fleet --dry-run` expose the contract without spawning a worker.
+
+### Evidence
+
+- `uv run pytest -q tests/test_fleet.py tests/test_ledger_terminal_status.py`: `10 passed`
+- `uv run pytest -q`: `70 passed`
+- `uv run forge plan /tmp/forge-agent-goal.json`: schema-valid `forge.task-graph.v1`
+- `uv run forge fleet /tmp/forge-agent-goal.json --dry-run`: terminal `planned` report
+- concurrency regression: two independent ready tasks reached peak active workers `2`
+- failure regression: runner exception closed the fleet run as `failed` with a terminal verdict event
+
+### Interpretation / root cause
+
+The repository previously had AO runner, verifier, ledger, watchdog, and
+reflection primitives, but no top-level controller that made Forge itself an
+agent responsible for a fleet run. This slice closes that architectural gap
+without duplicating AO's worktree or process supervision.
+
+### Decision or action
+
+Keep AO as the execution/worktree plane. Forge now owns goal intake, bounded
+task scheduling, context packaging, run lifecycle, evidence, and the handoff
+to reflection/gating. Hermes remains an optional bounded reflection sidecar,
+not an AO worker.
+
+### Impact
+
+- **Product/runtime:** Forge is no longer described only as a passive learning
+  layer; it has a controller runtime that can own a bounded fleet run.
+- **Evaluation:** live AO artifact-producing completion and cross-harness
+  transfer remain unverified and are not implied by these local tests.
+- **Pitch/demo:** "Forge is the agent that runs the fleet, verifies the work,
+  and only then decides what the fleet may learn."
+
+### Follow-up
+
+- **Owner:** Forge controller/integration
+- **Next verification:** run the controller against one explicitly approved
+  tiny AO task and read back the artifact plus independent verifier result.
+- **Status:** open
+
+### Pitch clip
+
+> "We moved Forge from a learning sidecar into the agent runtime itself: it
+> accepts the goal, schedules bounded workers, verifies artifacts, and feeds
+> only candidate evidence into learning. AO still owns the worker process; Forge
+> owns the outcome."
 
 ---
 
@@ -317,5 +498,56 @@ controller must not silently convert direct repairs into worker success.
 > repair two malformed agent-generated package files. We count that as
 > recovery with intervention—not autonomous success—and preserve the exact
 > distinction in the evidence trail."
+
+---
+
+## 2026-09-14 — Graph + memory refactor (0.2.0)
+
+- **Type:** milestone / refactor
+- **Status:** observed (tests only; no live worker run claimed)
+- **Agents/harnesses:** Forge core, pytest (local)
+- **Scope:** `src/forge/graph.py`, `src/forge/memory.py`, `src/forge/fleet.py`,
+  `src/forge/cli.py`, `tests/test_graph.py`, `tests/test_memory.py`,
+  `tests/test_fleet.py`
+
+### What changed
+
+- Added a typed execution graph: `NodeSpec` (planner / specialist / judge /
+  verifier / reflector / evaluator / memory / aggregator), `GraphSpec` with
+  bounded `max_parallel`/`max_depth`, typed edges (sequence, dependency, gate,
+  parallel, judge), `compile_goal_graph()` and a `to_taskgraph()` bridge that
+  rejects multi-level graphs loudly.
+- Added the context fabric: `Observation`, the `MemoryAdapter` protocol
+  (`write` / `recall` / `profile`), a deterministic `LocalMemoryStub`, and a
+  bounded `render_recall`.
+- Wired memory into `FleetController`: each task recalls into a fenced
+  `<MEMORY_CONTEXT>` block before execution and writes an `outcome` observation
+  after its verdict; `memory_recall` / `memory_write` ledger events are
+  recorded. With `memory=None` behavior is unchanged.
+- Added `forge graph <goal.json>` for graph readback.
+
+### Evidence
+
+```text
+uv run pytest -q  →  150 passed (was 122; +28 new tests)
+python3 -m py_compile  →  ok
+git diff --check  →  clean
+uv run forge graph /tmp/forge-graph-sample-goal.json  →  ok: true, node_count 2
+```
+
+### Interpretation
+
+This is a structural refactor verified by tests. It does **not** include a
+recursive scheduler, judge routing, or a live Supermemory backend — those are
+specified as Tasks 1–7 in `docs/BUILD.md`. No live AO completion is claimed.
+
+### Impact
+
+- **Product:** the graph and memory vocabulary now exist in code, not only in
+  planning documents; every later feature has a typed seam to plug into.
+- **Build:** `docs/BUILD.md` lets a non-frontier model continue the build with
+  exact steps, expected outputs, and failure modes.
+- **Evidence honesty:** all claims remain test-scoped; the live AO blocker and
+  the unconfigured Supermemory backend are stated as open.
 
 ---

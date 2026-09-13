@@ -111,6 +111,58 @@ class GateVerdict:
     reasons: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class EvaluationEvidence:
+    """Evidence owned by the evaluator, not authored by reflection."""
+
+    candidate_id: str
+    applicability_cases: tuple[str, ...]
+    baseline_passed: int
+    candidate_passed: int
+    heldout_passed: int
+    heldout_total: int
+    evidence_refs: tuple[str, ...]
+
+
+def evaluate_candidate(evidence: EvaluationEvidence) -> GateVerdict:
+    """Derive a promotion verdict from comparable trial evidence.
+
+    Counts are intentionally explicit. A reflection agent may propose a
+    candidate, but it cannot manufacture this evaluator-owned record.
+    """
+    reasons: list[str] = []
+    if not evidence.candidate_id.strip():
+        reasons.append("candidate_id_missing")
+    if not evidence.applicability_cases:
+        reasons.append("applicability_missing")
+    if evidence.baseline_passed < 0 or evidence.candidate_passed < 0:
+        reasons.append("trial_counts_invalid")
+    if evidence.heldout_total <= 0:
+        reasons.append("heldout evidence missing")
+    elif evidence.heldout_passed < evidence.heldout_total:
+        reasons.append("heldout regression")
+    if len(set(evidence.evidence_refs)) < 3:
+        reasons.append("three evidence refs required")
+
+    applicability = not any(reason in reasons for reason in ("candidate_id_missing", "applicability_missing"))
+    heldout_no_regression = evidence.heldout_total > 0 and evidence.heldout_passed == evidence.heldout_total
+    ab_benefit = evidence.candidate_passed > evidence.baseline_passed
+
+    if reasons and any(reason in reasons for reason in ("heldout evidence missing", "heldout regression", "three evidence refs required", "trial_counts_invalid")):
+        status = "rejected"
+    elif applicability and ab_benefit and heldout_no_regression:
+        status = "validated"
+    else:
+        status = "candidate"
+    return GateVerdict(
+        status=status,
+        applicability=applicability,
+        ab_benefit=ab_benefit,
+        heldout_no_regression=heldout_no_regression,
+        reasons=tuple(reasons or (["candidate did not improve comparable trial"] if not ab_benefit else [])),
+    )
+
+
 def promote_candidate(verdict: GateVerdict) -> bool:
     """Only the deterministic gate may promote a learning artifact."""
     return (

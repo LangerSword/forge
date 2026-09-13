@@ -63,10 +63,10 @@ def parse_spawn_output(output: str | AOCommandResult) -> AOSpawnResult:
     guessed HTTP spawn payload.
     """
     if isinstance(output, AOCommandResult):
-        if output.exit_code != 0:
-            raise AOCommandError(f"AO spawn failed ({output.exit_code}): {output.stderr[-500:]}")
-        text = output.stdout
+        json_candidates = [output.stdout, output.stderr]
+        text = "\n".join(part for part in json_candidates if part)
     else:
+        json_candidates = [output]
         text = output
     text = text.strip()
     if not text:
@@ -74,22 +74,30 @@ def parse_spawn_output(output: str | AOCommandResult) -> AOSpawnResult:
 
     session_id: Any | None = None
     worktree: Any | None = None
-    try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError:
-        parsed = None
-    if parsed is not None:
+    for candidate in json_candidates:
+        try:
+            parsed = json.loads(candidate.strip())
+        except (json.JSONDecodeError, AttributeError):
+            continue
         session_id = _find_json_value(parsed, {"session_id", "sessionId", "session", "id"})
         worktree = _find_json_value(parsed, {"worktree_path", "worktreePath", "worktree", "workspace", "workspace_path"})
+        if session_id is not None:
+            break
     if session_id is None:
         session_match = re.search(r"(?:session(?:[_ -]?id)?|id)\s*[:=]\s*([A-Za-z0-9._:-]+)", text, re.I)
         if session_match:
             session_id = session_match.group(1)
+        else:
+            live_match = re.search(r"\bspawned\s+session\s+([A-Za-z0-9._:-]+)\b", text, re.I)
+            if live_match:
+                session_id = live_match.group(1)
     if worktree is None:
         worktree_match = re.search(r"(?:worktree|workspace)(?:[_ -]?path)?\s*[:=]\s*(\S+)", text, re.I)
         if worktree_match:
             worktree = worktree_match.group(1).rstrip(",")
     if not isinstance(session_id, str) or not session_id.strip():
+        if isinstance(output, AOCommandResult) and output.exit_code != 0:
+            raise AOCommandError(f"AO spawn failed ({output.exit_code}): {output.stderr[-500:]}")
         raise AOCommandError("AO spawn output did not contain a session id")
     if isinstance(worktree, dict):
         worktree = _find_json_value(worktree, {"path", "absolute_path"})
@@ -130,6 +138,36 @@ class AOCLI:
     def status(self) -> AOCommandResult:
         return self.run(("status",))
 
+    def discover_worktree(self, session_id: str) -> Path | None:
+        """Resolve the observed AO Git worktree branch for a session."""
+        root = self.cwd or Path.cwd()
+        try:
+            proc = subprocess.run(
+                ("git", "-C", str(root), "worktree", "list", "--porcelain"),
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        if proc.returncode != 0:
+            return None
+        block: list[str] = []
+        for line in proc.stdout.splitlines() + [""]:
+            if line:
+                block.append(line)
+                continue
+            worktree_line = next((item for item in block if item.startswith("worktree ")), None)
+            branch_line = next((item for item in block if item.startswith("branch ")), None)
+            if (
+                worktree_line is not None
+                and branch_line == f"branch refs/heads/ao/{session_id}/root"
+            ):
+                return Path(worktree_line.removeprefix("worktree ").strip())
+            block = []
+        return None
+
     def spawn_command(self, *, project: str, name: str, prompt: str, harness: str = "opencode", mode: str = "chat") -> tuple[str, ...]:
         if len(name) > 20:
             raise ValueError("AO worker name must be <=20 characters")
@@ -146,7 +184,10 @@ class AOCLI:
         record the exact command before deciding whether to execute it.
         """
         command = self.spawn_command(project=project, name=name, prompt=prompt, harness=harness, mode=mode)
-        return self.run(command[1:])
+        # Spawn is side-effecting: preserve nonzero output so the runner can
+        # reconcile a session created before the CLI reported an error.
+        proc = subprocess.run(command, cwd=self.cwd, capture_output=True, text=True, timeout=30)
+        return AOCommandResult(command, proc.returncode, proc.stdout, proc.stderr)
 
     @neatlogs.span(kind="TOOL")
     def send(self, session_id: str, message: str) -> AOCommandResult:

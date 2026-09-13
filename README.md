@@ -1,31 +1,45 @@
-# Forge — a learning layer for agent fleets
+# Forge — a commander agent with verified, cumulative learning
 
 **Syndicate by Maximor · Track 1: Automated Agent Engineering**
 
-Give an agent fleet a goal, a repo, third-party tools, and a budget. Forge's
-target loop plans, executes through [Agent Orchestrator](https://aoagents.dev)
-workers, verifies the output, and **learns what it just proved**. Only lessons
-that survive an A/B gate become portable skills; a fresh worker on a
-*different harness* is intended to get the skill, not the conversation — and
-the improvement is measured, not claimed.
+Forge compiles a goal into a **typed execution graph**, runs it as a bounded
+fleet of specialist agents, carries context between handoffs through a shared
+**memory fabric instead of raw transcripts**, and promotes only capabilities
+that **measurably improve independently verified outcomes**.
 
-Forge now includes a bounded controller runtime: it validates a GoalSpec,
-builds a dependency-aware TaskGraph, assembles fenced task context, dispatches
-AO runner tasks, records task verdicts, and invokes a candidate-learning hook
-after the run closes. Dry-run planning and fake-backed fleet execution are
-covered by tests.
+Give it a goal, a repo, third-party tools, and a budget. Forge's target loop
+plans, executes through [Agent Orchestrator](https://aoagents.dev) workers,
+verifies the output, and **learns what it just proved**. Only lessons that
+survive an A/B gate become portable skills; a fresh worker on a *different
+harness* is intended to get the skill, not the conversation — and the
+improvement is measured, not claimed.
 
-The current hackathon artifact verifies a bounded local
-failure → repair → reflection → verification path. AO autonomous spawn/lifecycle
-and cross-harness transfer are core roadmap targets, not completed claims in
-this checkout.
+The current checkout implements the graph and memory layers on top of the
+bounded controller runtime: typed `NodeSpec`/`GraphSpec` compilation
+(`forge graph`), the `MemoryAdapter` context-fabric protocol with a
+deterministic local stub, memory recall/write wiring in the fleet controller,
+plus the earlier controller (GoalSpec validation, dependency-aware scheduling,
+fenced task context, verifier authority, task checkpoints, deadlines).
+
+Scaffolding for what comes next is written for any model to execute:
+`docs/BUILD.md` is a step-by-step plan (recursive scheduler, judge routing,
+live Supermemory adapter) with exact tests, expected outputs, and failure
+modes.
+
+The current checkout verifies the local learning path, the graph/memory
+refactor, and the controller's hard runtime safeguards. A real AO/OpenCode
+session was spawned, recovered, and cleaned up, but the worker produced no
+requested artifact after one bounded nudge. AO artifact-producing completion
+and cross-harness transfer remain open proof points; no autonomous success
+claim is made.
 
 ## Status and evidence boundary
 
-- **AO autonomous execution — target:** AO health/readiness and the read-only
-  catalog/session surface are observed, but Forge's exact spawn payload and
-  reliable worker-completion/lifecycle signal are currently unverified. An
-  idle or listed session is not counted as autonomous success.
+- **AO autonomous execution — blocked proof:** AO health/readiness, live CLI
+  spawn output, session IDs, branch-based worktree discovery, activity
+  normalization, bounded nudge/kill, and cleanup are observed. The final live
+  worker was a no-op with no artifact, so reliable artifact-producing
+  autonomous completion is still unverified.
 - **Cross-harness transfer — target:** the portable context-package contract is
   designed for a fresh worker on a different AO harness. Only OpenCode is
   currently observed authorized in AO, so no transfer result is claimed.
@@ -36,9 +50,11 @@ this checkout.
   authenticated probe, and readback of a real `forge openai-smoke` trace are
   verified for the OpenAI smoke/diagnostic path. This does not prove full AO
   worker or fleet trace coverage.
-- **Supermemory — future integration:** Supermemory is planned as an external
-  skill/context adapter. The local `.forge` registry and ledger remain
-  authoritative until that integration is implemented and read back.
+- **Supermemory — protocol implemented; backend planned:** the context-fabric
+  contract (`MemoryAdapter`: write / recall / profile) and a deterministic
+  `LocalMemoryStub` are implemented and wired into the fleet controller. A live
+  Supermemory backend is not yet configured or read back; until it is, the
+  local `.forge` registry, ledger, and stub remain authoritative.
 
 The tracked C0 submission report records a failing baseline and a passing
 bounded repair, plus a `candidate` skill artifact; it explicitly does not claim

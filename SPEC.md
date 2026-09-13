@@ -1,6 +1,6 @@
 # Forge — Spec Sheet
 
-**Version:** 0.1.2 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-07
+**Version:** 0.2.0 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-14
 **Track:** Syndicate by Maximor — Track 1: Automated Agent Engineering
 **Deadline:** 2026-09-07 03:30 IST (Devpost)
 **Working dir:** `~/forge` · **Remote:** `https://github.com/LangerSword/forge`
@@ -14,20 +14,66 @@
 
 ## 1. One-liner
 
-**Forge is a learning layer for agent fleets: it runs goal-driven builds through
-AO-managed coding agents, captures the evidence, tests what it learned, and
-promotes only verified capabilities — so the next task runs faster, cheaper,
-and across different harnesses, with the improvement measurable.**
+**Forge is a commander agent that compiles a goal into a typed execution graph
+of specialist agents, carries context between handoffs through a shared memory
+fabric instead of transcripts, and promotes only capabilities that measurably
+improve independently verified outcomes.**
 
 Pitch line for the video:
 > "AO runs the workers. Forge turns their verified experience into portable
 > skills that transfer across harnesses — and every improvement is measured,
 > not claimed."
 
+### Graph + memory architecture (observed local slice, 2026-09-14)
+
+The runtime now has a typed execution graph and a memory-fabric protocol:
+
+- **`src/forge/graph.py`** — `GraphSpec` of typed `NodeSpec`s (planner,
+  specialist, judge, verifier, reflector, evaluator, memory, aggregator)
+  connected by typed edges (sequence, dependency, gate, parallel, judge).
+  `compile_goal_graph()` deterministically compiles a `GoalSpec` into a
+  specialist node behind a verifier gate. `to_taskgraph()` bridges the
+  single-level subset onto the existing executor; deeper graphs are rejected
+  loudly until the recursive scheduler exists.
+- **`src/forge/memory.py`** — the context fabric. `Observation` is the unit
+  every node writes; `MemoryAdapter` is the protocol (`write` / `recall` /
+  `profile`); `LocalMemoryStub` implements it deterministically with bounded
+  token rendering. Nodes recall relevant memory before acting and write
+  structured observations after acting — handoffs carry memory references,
+  not transcripts.
+- **`FleetController`** now accepts an optional `memory` adapter: each task
+  recalls memory into a fenced `<MEMORY_CONTEXT>` block before execution and
+  writes an `outcome` observation after its verdict. With `memory=None`
+  behavior is byte-identical to before (no extra ledger events).
+- **`forge graph <goal.json>`** prints the compiled graph and node counts.
+
+This is a structural refactor verified by tests: `150 passed`, including
+28 new tests (`tests/test_graph.py`, `tests/test_memory.py`, and three fleet
+memory-wiring tests). It does not yet include a recursive scheduler, judge
+routing, or a live Supermemory backend — those remain build-plan items in
+`docs/BUILD.md`.
+
 ### Evidence boundary (2026-09-07)
 
 This spec separates the product target from what this checkout has actually
 observed:
+
+- **Controller runtime (observed local slice):** Forge now validates a
+  `GoalSpec`, builds a dependency-aware `TaskGraph`, assembles a fenced
+  `ContextPackage`, schedules independent tasks up to `max_parallel`, records
+  task verdicts, blocks failed dependents, and closes a terminal ledger report.
+  The slice is fake-backed and dry-run verified; it does not by itself prove a
+  live AO worker completed a task.
+- **Hard runtime safeguards (observed local slice):** Forge requires an
+  independent verifier for pass, rejects stale artifacts by digest, parses the
+  live AO spawn output, discovers AO worktrees from observed Git branches,
+  persists task-attempt checkpoints with compare-and-set transitions, resumes
+  known sessions without duplicate spawn, cleans up verified sessions, and
+  enforces fleet runtime budgets.
+- **Live AO boundary (observed blocker):** a real OpenCode worker session was
+  spawned and recovered through AO, but produced no changed files or requested
+  artifact after one bounded nudge. Forge classified it as `no_op`, terminated
+  it, and recorded `failed`; this is not autonomous completion evidence.
 
 - **AO autonomous execution (core target):** Forge is intended to plan, spawn,
   monitor, and verify AO workers without hidden controller work. AO health,
@@ -46,10 +92,11 @@ observed:
   probe, and readback of a real `forge openai-smoke` trace are verified for the
   OpenAI smoke/diagnostic path. This is not evidence that every AO worker trace
   or the full autonomous fleet path is externally delivered.
-- **Supermemory (future integration):** Supermemory is a planned external
-  memory/skill adapter, not a current runtime dependency or persistence claim.
-  The local Forge registry and ledger remain authoritative until that adapter
-  is implemented and read back.
+- **Supermemory (planned integration; protocol now implemented locally):** the
+  context-fabric contract (`MemoryAdapter`: write / recall / profile) and a
+  deterministic `LocalMemoryStub` are implemented and wired into the fleet
+  controller. A live Supermemory backend is not yet configured or read back;
+  until it is, the local registry, ledger, and stub remain authoritative.
 
 ## 2. Why this (positioning)
 
@@ -399,6 +446,30 @@ contradict this section.)*
     through `forge.journal.ProjectJournal`; it requires evidence and redacts
     secret-like fields. Never journal a secret, raw transcript, or unsupported
     success claim.
+13. **Agent design principles (from razorpay-agent vs ZapAI post-mortem):**
+    - **Real integrations > conceptual elegance.** A system that connects to real
+      external APIs, persists state across restarts, and handles real webhooks is
+      more valuable than one with perfect safety formalism but no external
+      connections. Safety and integrations are both non-negotiable.
+    - **Persistence is non-negotiable.** In-memory state is a demo artifact.
+      Durable storage (SQLite/Postgres/Redis with migrations) from the start.
+    - **LLM drives reasoning within guardrails.** An agent that only "advises"
+      while a scripted fallback does the real work is weaker than an LLM with
+      structured tool calling within deterministic safety bounds.
+    - **Frontend is the product.** Analytics, conversation inspectors, audit
+      explorers, onboarding wizards — part of the product surface, not decorative.
+    - **Scope = end-to-end journey.** Onboarding → catalog → negotiation →
+      settlement → analytics. No gaps. Every stage addressable even if stubbed.
+    - **Inventory locking is real.** Atomic reservation (Redis SET NX EX 120)
+      with instant release on timeout/failure. Without this, autonomous commerce
+      is impossible.
+    - **Cryptographic audit trails are compliance infrastructure.** SHA-256 hash
+      chains, Ed25519 checkpoints, RFC 8785 canonical JSON — foundation for
+      dispute resolution and regulatory compliance, not polish.
+    - **Multi-tenant from day one.** Isolated credentials, onboarding wizard,
+      per-store settings.
+    - **Tests cover integration scenarios.** Webhook HMAC verification, inventory
+      locking, cryptographic audit chains, multi-turn conversations.
 
 ## 15. Packaging and deployment contract
 
@@ -469,3 +540,32 @@ unattended production deployment.
   cross-harness transfer are core roadmap targets rather than completed claims;
   recorded OpenCode-only authorization, Hermes sidecar boundaries, verified
   Neatlogs smoke/diagnostic evidence, and Supermemory as future integration.
+- **0.1.3** (2026-09-07): made Forge's product framing explicit as an
+  agent/controller runtime with a learning layer; added strict TaskSpec/
+  TaskGraph/ContextPackage contracts, bounded concurrent FleetController
+  execution, `forge plan` and dry-run `forge fleet`, thread-safe ledger writes,
+  and fake-backed controller tests. Live AO artifact-producing completion and
+  cross-harness transfer remain open.
+- **0.1.4** (2026-09-08): hardened the real AO boundary with live spawn-output
+  parsing, branch-based worktree discovery, nested activity normalization,
+  runtime deadlines, verified-session cleanup, typed task-attempt checkpoints,
+  stale-artifact rejection, explicit verifier commands, and evaluator-owned
+  learning gates. Four bounded live AO attempts remained blocked by an
+  OpenCode no-op worker; no autonomous completion or transfer claim was added.
+- **0.1.5** (2026-09-14): integrated razorpay-agent vs ZapAI post-mortem
+  lessons as agent design principles (§13). Core tenets: real integrations
+  over conceptual elegance, persistence as first-class requirement, LLM
+  reasoning within guardrails, safety + integrations (not either/or), multi-tenant
+  from day one, frontend as product, inventory locking, cryptographic audit trails,
+  end-to-end scope, integration-scenario tests. Added §13-19 to agent rules.
+- **0.2.0** (2026-09-14): structural refactor to the graph + memory
+  architecture from `.hermes/plans/2026-09-10_105000-forge-graph-architecture.md`.
+  Added `src/forge/graph.py` (typed `NodeSpec`/`GraphSpec`, edge types,
+  `compile_goal_graph`, `to_taskgraph` bridge) and `src/forge/memory.py`
+  (context-fabric protocol: `Observation`, `MemoryAdapter`, `LocalMemoryStub`,
+  bounded `render_recall`). `FleetController` gained an optional `memory`
+  adapter — recall before execution into a fenced `<MEMORY_CONTEXT>` block,
+  write an `outcome` observation after each verdict — with byte-identical
+  behavior when `memory=None`. Added `forge graph <goal.json>`. 150 tests
+  pass (28 new). Recursive scheduler, judge routing, and the live Supermemory
+  adapter remain open and are specified in `docs/BUILD.md`.

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import subprocess
 import time
+import hashlib
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Protocol
@@ -47,7 +49,10 @@ class AORunRequest:
     condition: str = "C0"
     artifact_path: Path | None = None
     worktree: Path | None = None
+    existing_session_id: str | None = None
+    independent_verifier: IndependentVerifier | None = None
     max_polls: int = 30
+    max_runtime_s: float | None = None
     poll_interval_s: float = 1.0
     max_idle_s: float = 90.0
     nudge: str = "Continue the scoped task; report blockers."
@@ -69,6 +74,8 @@ class AORunRequest:
             raise ValueError("poll_interval_s must be >= 0")
         if self.max_idle_s < 0:
             raise ValueError("max_idle_s must be >= 0")
+        if self.max_runtime_s is not None and self.max_runtime_s <= 0:
+            raise ValueError("max_runtime_s must be > 0 when provided")
 
 
 @dataclass(frozen=True)
@@ -151,16 +158,41 @@ def _bool(value: Any, default: bool = False) -> bool:
     return value if isinstance(value, bool) else default
 
 
-def session_snapshot(payload: dict[str, Any], *, session_id: str) -> SessionSnapshot:
+def _parse_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def session_snapshot(
+    payload: dict[str, Any],
+    *,
+    session_id: str,
+    now: datetime | None = None,
+) -> SessionSnapshot:
     """Normalize an observed AO session response to the watchdog contract."""
     raw_id = _nested_value(payload, {"session_id", "sessionId", "id"})
     observed_id = str(raw_id) if raw_id not in (None, "") else session_id
     raw_status = _nested_value(payload, {"status", "state"})
     status = str(raw_status).strip().lower() if raw_status not in (None, "") else "unknown"
-    activity = _nested_value(payload, {"activity_state", "activityState", "activity"})
+    activity = _nested_value(payload, {"activity_state", "activityState"})
+    if activity in (None, ""):
+        activity_payload = _nested_value(payload, {"activity"})
+        if isinstance(activity_payload, dict):
+            activity = activity_payload.get("state")
     activity_state = str(activity).strip().lower() if activity not in (None, "") else status
     elapsed = _number(_nested_value(payload, {"elapsed_s", "elapsedSeconds", "elapsed"}))
     last_activity = _number(_nested_value(payload, {"last_activity_s", "lastActivitySeconds", "last_activity"}))
+    now = now or datetime.now(timezone.utc)
+    created_at = _parse_timestamp(_nested_value(payload, {"createdAt", "created_at"}))
+    last_activity_at = _parse_timestamp(_nested_value(payload, {"lastActivityAt", "last_activity_at"}))
+    if created_at is not None:
+        elapsed = max(0.0, (now - created_at).total_seconds())
+    if last_activity_at is not None:
+        last_activity = max(0.0, (now - last_activity_at).total_seconds())
     terminated = _bool(_nested_value(payload, {"is_terminated", "isTerminated", "terminated"}))
     if status in {"terminated", "exited", "killed", "failed"}:
         terminated = True
@@ -208,6 +240,19 @@ def _safe_command(command: tuple[str, ...]) -> tuple[str, ...]:
             result.append(item)
             redact_next = item == "--prompt"
     return tuple(result)
+
+
+def _artifact_fingerprint(path: Path | None) -> str | None:
+    if path is None or not path.is_file():
+        return None
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(65536), b""):
+                digest.update(chunk)
+    except OSError:
+        return None
+    return digest.hexdigest()
 
 
 class AORunner:
@@ -289,55 +334,131 @@ class AORunner:
             self.ledger.update_run_status(request.run_id, result.status)
         return result
 
+    def _cleanup_session(
+        self,
+        request: AORunRequest,
+        events: list[AORunEvent],
+        session_id: str,
+        *,
+        reason: str,
+    ) -> None:
+        """Close a terminal AO session without changing the verifier verdict."""
+        try:
+            self.ao_client.kill(session_id)
+            self._record(
+                events,
+                request,
+                "cleanup",
+                {"session_id": session_id, "action": "kill", "reason": reason},
+            )
+        except Exception as exc:
+            self._record(
+                events,
+                request,
+                "cleanup_error",
+                {"session_id": session_id, "error_type": type(exc).__name__, "reason": reason},
+            )
+
     def run(self, request: AORunRequest) -> AORunResult:
         events: list[AORunEvent] = []
         if self.ledger is not None:
             self.ledger.run(request.run_id, request.goal, request.condition, request.harness, "running")
 
-        try:
-            command = self.ao_cli.spawn_command(
-                project=request.project,
-                name=request.worker_name,
-                prompt=request.prompt,
-                harness=request.harness,
-                mode=request.mode,
-            )
-            self._record(events, request, "spawn", {"command": _safe_command(command), "decision": "execute"})
-            spawned = self.ao_cli.spawn(
-                project=request.project,
-                name=request.worker_name,
-                prompt=request.prompt,
-                harness=request.harness,
-                mode=request.mode,
-            )
-            parsed = parse_spawn_output(spawned)
+        if request.existing_session_id:
+            session_id = request.existing_session_id
+            worktree = request.worktree
             self._record(
                 events,
                 request,
-                "spawn_result",
-                {"exit_code": spawned.exit_code, "session_id": parsed.session_id, "worktree": parsed.worktree},
+                "resume",
+                {"session_id": session_id, "decision": "poll_existing_session", "worktree": worktree},
             )
-        except Exception as exc:
-            self._record(events, request, "spawn_error", {"error_type": type(exc).__name__})
-            return self._result(
-                request,
-                events,
-                status="failed",
-                classification=WorkerClassification.TERMINATED,
-                session_id=None,
-                worktree=request.worktree,
-                reason=f"spawn_failed:{type(exc).__name__}",
-            )
-
-        session_id = parsed.session_id
-        worktree = parsed.worktree or request.worktree
+        else:
+            try:
+                command = self.ao_cli.spawn_command(
+                    project=request.project,
+                    name=request.worker_name,
+                    prompt=request.prompt,
+                    harness=request.harness,
+                    mode=request.mode,
+                )
+                self._record(events, request, "spawn", {"command": _safe_command(command), "decision": "execute"})
+                spawned = self.ao_cli.spawn(
+                    project=request.project,
+                    name=request.worker_name,
+                    prompt=request.prompt,
+                    harness=request.harness,
+                    mode=request.mode,
+                )
+                parsed = parse_spawn_output(spawned)
+                self._record(
+                    events,
+                    request,
+                    "spawn_result",
+                    {"exit_code": spawned.exit_code, "session_id": parsed.session_id, "worktree": parsed.worktree},
+                )
+            except Exception as exc:
+                self._record(events, request, "spawn_error", {"error_type": type(exc).__name__})
+                return self._result(
+                    request,
+                    events,
+                    status="failed",
+                    classification=WorkerClassification.TERMINATED,
+                    session_id=None,
+                    worktree=request.worktree,
+                    reason=f"spawn_failed:{type(exc).__name__}",
+                )
+            session_id = parsed.session_id
+            worktree = parsed.worktree or request.worktree
+            if worktree is None:
+                discover = getattr(self.ao_cli, "discover_worktree", None)
+                if discover is not None:
+                    worktree = discover(session_id)
+                    self._record(
+                        events,
+                        request,
+                        "worktree_discovered" if worktree is not None else "worktree_unavailable",
+                        {"session_id": session_id, "worktree": worktree},
+                    )
         nudge_count = 0
+        independent_verifier = request.independent_verifier or self.independent_verifier
         last_artifact = False
         last_verification = False
         last_classification: WorkerClassification | None = None
         last_reason = ""
+        artifact = self._artifact_path(request, worktree)
+        baseline_fingerprint = _artifact_fingerprint(artifact)
+        self._record(
+            events,
+            request,
+            "artifact_baseline",
+            {"artifact": artifact, "fingerprint": baseline_fingerprint},
+        )
 
+        started_at = time.monotonic()
         for poll_number in range(1, request.max_polls + 1):
+            if request.max_runtime_s is not None and time.monotonic() - started_at >= request.max_runtime_s:
+                try:
+                    self.ao_client.kill(session_id)
+                    self._record(
+                        events,
+                        request,
+                        "kill",
+                        {"session_id": session_id, "decision": "runtime_budget", "max_runtime_s": request.max_runtime_s},
+                    )
+                except Exception as exc:
+                    self._record(events, request, "kill_error", {"session_id": session_id, "error_type": type(exc).__name__})
+                return self._result(
+                    request,
+                    events,
+                    status="stopped",
+                    classification=WorkerClassification.LIVENESS_STUCK,
+                    session_id=session_id,
+                    worktree=worktree,
+                    artifact_exists=last_artifact,
+                    verification_passed=last_verification,
+                    reason="runtime_budget_exceeded",
+                )
             try:
                 payload = self.ao_client.session(session_id)
                 snapshot = session_snapshot(payload, session_id=session_id)
@@ -356,17 +477,71 @@ class AORunner:
                 )
 
             artifact = self._artifact_path(request, worktree)
-            artifact_exists = artifact is not None and artifact.exists() and artifact.is_file()
+            artifact_fingerprint = _artifact_fingerprint(artifact)
+            artifact_exists = artifact_fingerprint is not None
+            artifact_fresh = artifact_exists and artifact_fingerprint != baseline_fingerprint
             changed_files = self.changed_files_probe(worktree) if worktree is not None else ()
             verification_passed = False
             verification_error: str | None = None
-            if artifact_exists:
-                if self.independent_verifier is None:
-                    verification_passed = True
+            if artifact_exists and not artifact_fresh:
+                self._record(
+                    events,
+                    request,
+                    "stale_artifact",
+                    {"poll": poll_number, "artifact": artifact, "fingerprint": artifact_fingerprint},
+                )
+                if snapshot.is_terminated or snapshot.status in {"terminated", "exited", "killed", "completed", "done"}:
+                    return self._result(
+                        request,
+                        events,
+                        status="blocked",
+                        classification=WorkerClassification.TERMINATED,
+                        session_id=session_id,
+                        worktree=worktree,
+                        artifact_exists=True,
+                        verification_passed=False,
+                        reason="stale_artifact",
+                    )
+            if artifact_exists and artifact_fresh:
+                if independent_verifier is None:
+                    self._record(
+                        events,
+                        request,
+                        "verification_unavailable",
+                        {"poll": poll_number, "reason": "independent verifier is required"},
+                    )
+                    if not snapshot.is_terminated and snapshot.status not in {"terminated", "exited", "killed"}:
+                        try:
+                            self.ao_client.kill(session_id)
+                            self._record(
+                                events,
+                                request,
+                                "kill",
+                                {"session_id": session_id, "decision": "verification_unavailable"},
+                            )
+                        except Exception as exc:
+                            self._record(
+                                events,
+                                request,
+                                "kill_error",
+                                {"session_id": session_id, "error_type": type(exc).__name__},
+                            )
+                    return self._result(
+                        request,
+                        events,
+                        status="blocked",
+                        classification=WorkerClassification.VERIFICATION_UNAVAILABLE,
+                        session_id=session_id,
+                        worktree=worktree,
+                        artifact_exists=True,
+                        verification_passed=False,
+                        reason="independent_verifier_required",
+                    )
                 else:
                     try:
                         verification_root = worktree if worktree is not None else artifact.parent
-                        verification_passed = bool(self.independent_verifier(verification_root, artifact))
+                        assert artifact is not None
+                        verification_passed = bool(independent_verifier(verification_root, artifact))
                     except Exception as exc:
                         verification_error = type(exc).__name__
             if artifact is not None:
@@ -378,6 +553,9 @@ class AORunner:
                         "poll": poll_number,
                         "artifact": artifact,
                         "artifact_exists": artifact_exists,
+                        "artifact_fresh": artifact_fresh,
+                        "artifact_fingerprint": artifact_fingerprint,
+                        "baseline_fingerprint": baseline_fingerprint,
                         "verification_passed": verification_passed,
                         "verification_error": verification_error,
                     },
@@ -425,6 +603,12 @@ class AORunner:
             last_classification, last_reason = decision.classification, decision.reason
 
             if decision.classification == WorkerClassification.PASSED:
+                self._cleanup_session(
+                    request,
+                    events,
+                    session_id,
+                    reason="verified_artifact",
+                )
                 return self._result(
                     request,
                     events,

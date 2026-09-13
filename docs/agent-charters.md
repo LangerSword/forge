@@ -1,9 +1,31 @@
 # Forge agent fleet — charters and operating contracts
 
 **Status:** design baseline, not implementation evidence
-**Version:** 0.1.0 · **Updated:** 2026-09-06
+**Version:** 0.1.1 · **Updated:** 2026-09-14
 **Source of truth:** `SPEC.md` for product constraints; this file defines
 agent responsibilities and handoffs.
+
+## Design influences (2026-09-14)
+
+These charters are informed by a post-mortem comparison between razorpay-agent
+and ZapAI (see `docs/stack.md` §Design influences). The core lessons:
+
+1. **Real integrations > conceptual elegance** — agents must connect to real
+   external systems, not just internal state.
+2. **Persistence is non-negotiable** — in-memory state is a demo artifact;
+   durable storage with migrations is the floor.
+3. **LLM reasoning within guardrails** — LLM drives decisions, deterministic
+   gate enforces bounds. Not advisory-only.
+4. **Safety + integrations** — never sacrifice one for the other.
+5. **Multi-tenant from day one** — isolated credentials, per-store settings.
+6. **Frontend is the product** — dashboards, inspectors, explorers are core.
+7. **Inventory locking is real** — atomic locks during negotiation windows.
+8. **Cryptographic audit trails** — hash chains, Ed25519, RFC 8785.
+9. **Scope = end-to-end journey** — onboarding → catalog → negotiation →
+   settlement → analytics. No gaps.
+10. **Tests cover integration scenarios** — webhooks, locking, audit chains.
+
+---
 
 ## Operating principle
 
@@ -24,6 +46,28 @@ Goal
   -> Skill Registry / Strategy Registry
   -> next run
 ```
+
+### Node-type mapping (0.2.0)
+
+Charters are roles; graph nodes are the executable units. Every charter maps
+to exactly one node type from `src/forge/graph.py`:
+
+| Charter | Node type | Notes |
+|---|---|---|
+| A0 Fleet Controller / Run Manager | (scheduler) | the executor itself, not a node |
+| A1 Architect / Planner | `planner` | may expand into a subgraph |
+| A2 Repository Scout / Context Builder | `memory` | recall/write against the context fabric |
+| A3 Builder / Implementer | `specialist` | the default work node |
+| A4 Tool / Integration Specialist | `specialist` | same node type, tool-scoped |
+| A5 Independent Verifier / QA | `verifier` | the only node allowed to pass work |
+| A6 Failure Analyst / Reflection Specialist | `reflector` | produces candidates only |
+| A7 Evaluation Engineer / Gatekeeper | `evaluator` | deterministic promotion gate |
+| A8 Repair / Self-Healing Agent | `specialist` | bounded retry with its own budget |
+| A9 Deployment / Release Agent | `specialist` | requires human approval boundary |
+| A10 Fleet Auditor / Memory Curator | `aggregator` | merges and consolidates results |
+
+Every node obeys the memory lifecycle: **recall before execution, write after
+execution** — nodes never hand each other raw transcripts.
 
 ## Shared contract for every agent
 
@@ -61,7 +105,9 @@ individual acceptance checks, and only Forge's gate can promote learning.
 **Purpose:** deterministic runtime owner. This is code plus a small control
 agent only where planning is necessary; it is not a giant autonomous persona.
 
-**Goal:** execute a `GoalSpec` within its budget, preserve evidence, and leave
+**Goal:** act as Forge's agent runtime: execute a `GoalSpec` within its budget,
+coordinate a bounded fleet through AO, preserve evidence, and leave the project
+in a recoverable state.
 the project in a recoverable state.
 
 **Inputs:** GoalSpec, AO endpoint, registry index, provider configuration.
@@ -368,6 +414,12 @@ fleet is five roles:
 3. A3 Builder through AO/OpenCode
 4. A5 Verifier
 5. A6 Reflection + A7 Gatekeeper (can be one process with separate phases)
+
+The first implemented controller slice is intentionally smaller than the full
+charter: GoalSpec → bounded TaskGraph → fenced ContextPackage → AO runner
+injection → ledger-backed task verdicts → candidate-learning hook. Planning and
+fake-backed execution are observed; a live AO artifact-producing end-to-end run
+remains unverified.
 
 A8 is added when the first real failure is observed. A4, A9, and A10 are
 specialist extensions after the core loop is green.

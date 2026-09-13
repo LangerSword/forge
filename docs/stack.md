@@ -1,32 +1,66 @@
 # Forge — Stack and Runtime Boundaries
 
-**Version:** 0.1.0 · Companion to `SPEC.md` and `architecture.md`
+**Version:** 0.1.1 · Companion to `SPEC.md` and `architecture.md`
 
 This file records the implementation stack, evidence status, and target integrations. It is intentionally explicit about what is live versus what is still a target.
+
+## Design influences (2026-09-14)
+
+Forge's architecture is informed by a head-to-head comparison of two Razorpay
+Buildathon 2026 entries:
+
+| | razorpay-agent (LangerSword) | ZapAI (lviffy) |
+|---|---|---|
+| Commits | 127 | 93 |
+| Stack | FastAPI + React + LinUCB + Pydantic | Next.js 15 + Bun + Express + Gemini |
+| Razorpay | Orders + Payment Links only | 10 modules: Orders, Payment Links, UPI QR, GST Invoices, AutoPay, Offers, Route, Refunds, Disputes, Webhooks |
+| External APIs | Razorpay SDK only | WhatsApp Cloud, Shopify OAuth, Neon PG, Redis |
+| Persistence | In-memory Python dicts | Neon PostgreSQL + migrations + Redis |
+| Audit | Simple audit log | 8-stage SHA-256 hash chain + Ed25519 + RFC 8785 |
+| Safety | Property-fuzzed gate (20k, 0 violations) | Business guardrails, HMAC verification |
+| Tests | pytest suite, gate fuzzing | 43 tests across 5 suites |
+| Frontend | YC-themed React, pure CSS, zero UI libs | Next.js 15 dashboard, Radix, Framer Motion |
+| Degradation | Keyless stub fallback | Requires real API keys |
+| Merchant tooling | Single store, no onboarding | Multi-tenant, onboarding wizard, per-store settings |
+| Scope | Dual-agent demo | Full merchant platform |
+
+**What we learned:** ZapAI won on product completeness because it connected to
+real systems. Our razorpay-agent won on safety formalism (property-fuzzed gate,
+clean LLM/money separation, principled bandit). Forge's design synthesizes
+both: real connections, real persistence, real safety.
+
+---
 
 ## Current implementation
 
 | Layer | Technology | Current evidence |
 |---|---|---|
-| Control plane | Python package, `uv`, Hatchling, Pydantic | `uv build` succeeds; `uv run pytest -q` reports 61 passed |
-| CLI | `forge` console entrypoint | `status`, `harnesses`, C0 verification, submission MVP, ledger readback, dashboard scaffold exercised |
-| Run state | SQLite ledger + project JSONL journal | Unique submission runs persist goal, baseline, repair, skill candidate, and verdict events |
+| Control plane | Python package, `uv`, Hatchling, Pydantic | `uv build` succeeds; fleet controller contracts and full regression suite exercised |
+| Typed graph | `src/forge/graph.py` — `NodeSpec`/`GraphSpec`, edge types, `compile_goal_graph`, `to_taskgraph` | 16 tests: validation (dupes, cycles, unknown deps, bounds), deterministic compilation, CLI readback |
+| Context fabric | `src/forge/memory.py` — `Observation`, `MemoryAdapter`, `LocalMemoryStub`, bounded `render_recall` | 9 tests: write/recall/profile, task-family filtering, deterministic ordering, bounded rendering |
+| CLI | `forge` console entrypoint | `status`, `harnesses`, `plan`, `graph`, dry-run `fleet`, C0 verification, submission MVP, experiment commands, ledger readback, dashboard scaffold exercised |
+| Run state | SQLite ledger + project JSONL journal | Unique submission runs persist goal, baseline, repair, skill candidate, and verdict events; fleet tasks record `memory_recall`/`memory_write` events when a memory adapter is attached |
 | Candidate verification | Frozen verifier-owned pytest bundle in a temporary sandbox | C0 baseline fails, one bounded repair passes, independent final verification passes |
 | Reflection | OpenAI SDK, pinned `gpt-5-nano`, Responses Structured Outputs | Real reflection call returned a schema-valid `SkillCandidate` with `status=candidate` |
-| Execution plane | Agent Orchestrator daemon over loopback + OpenCode | AO health/readiness/catalog/session reads observed; bounded `forge.ao-runner.v1` tested with fakes; isolated worker worktrees created |
+| Execution plane | Agent Orchestrator daemon over loopback + OpenCode | AO health/readiness and live spawn/session/worktree readback observed; Forge recovered real sessions and enforced no-op cleanup, but live artifact-producing completion remains blocked |
 | Observability | Neatlogs Python SDK, `neatlogs.init`, `neatlogs.wrap`, workflow/tool spans | Fresh `submission-mvp --reflect` trace readback passed: 7 persisted spans and required application I/O |
 | Local fallback | JSONL trace sink and SQLite evidence | Authoritative when hosted trace delivery is unavailable |
-| Website model | Static product/docs/support site in tracked `web/` package | Product homepage, four docs routes, support route, self-authored SVG artifacts; Vercel public readback passed |
+| Website model | Private repository `LangerSword/forge-website` (split from core) | Root-layout build and route smoke verified in the private repo; Vercel production readback on the previous deployment |
 
 ## Target autonomous fleet
 
-The production topology is:
+The product topology is:
 
 ```text
 Goal
-  → Forge planner
+  → Forge commander
+  → typed execution graph (GraphSpec: planner / specialist / judge / verifier)
+  → recursive scheduler (bounded depth, judge routing)
+  → per-node RECALL from the context fabric (Supermemory protocol)
+  → fenced context package + memory block
   → AO orchestrator
   → isolated workers on supported harnesses
+  → per-node WRITE of structured observations
   → independent verifier
   → bounded repair
   → reflection / candidate skill
@@ -35,7 +69,11 @@ Goal
   → fresh worker / second harness
 ```
 
-AO remains the execution and worktree plane. Forge owns the learning contract, evidence ledger, verifier, repair budget, and promotion gate. A worker's final message never counts as success without an artifact and independent verification.
+Forge is the commander: graph scheduler and memory fabric sit side by side,
+both above the node layer. AO remains the execution and worktree plane. Forge
+owns the learning contract, evidence ledger, verifier, repair budget, and
+promotion gate. A worker's final message never counts as success without an
+artifact and independent verification.
 
 ## Harness strategy
 
@@ -56,7 +94,8 @@ It reports supported, installed, authorized, and explicitly smoke-tested states.
 
 - **Current source of truth:** `.forge/skills/`, `evals/results/`, SQLite, and the project journal.
 - **Candidate lifecycle:** reflection may create `candidate`; only Forge's applicability, A/B, and held-out regression gates may promote `validated`.
-- **Future:** Supermemory as a read/write external skill and context adapter after local registry semantics are stable and readback is verified. Supermemory is not claimed as integrated in this submission.
+- **Context fabric (implemented 2026-09-14):** `src/forge/memory.py` defines the `MemoryAdapter` protocol (`write` / `recall` / `profile`) and a deterministic `LocalMemoryStub`. Nodes recall relevant observations before acting and write structured `Observation`s after acting, so handoffs carry memory references instead of transcripts. `FleetController` accepts an optional `memory` adapter and emits `memory_recall`/`memory_write` ledger events.
+- **Live backend (planned):** the Supermemory adapter sits behind the same protocol — see `docs/BUILD.md` Task 6. It is not claimed as integrated until implemented, configured, and read back.
 
 ## Neatlogs contract
 
@@ -92,13 +131,13 @@ Vercel is the first web deployment adapter target. Android/APK and hosted multi-
 
 The following are observed now:
 
-- 61 passing local tests.
-- The bounded AO Runner/readiness contract and fake-backed tests.
+- 102 passing local tests.
+- The bounded AO Runner/readiness contract, real AO spawn/worktree/session readback, and fake-backed tests.
 - Successful package build.
 - Real GPT-5 Nano reflection.
 - C0 failure → bounded repair → final pass.
 - Fresh Neatlogs readback of the full submission workflow.
-- AO daemon health/readiness and isolated worktree creation.
+- AO daemon health/readiness, isolated worktree creation, live session cleanup, and a recorded no-op blocker.
 
 The following remain required future proof, not observed completion:
 

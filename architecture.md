@@ -1,6 +1,6 @@
 # Forge — Architecture
 
-**Version:** 0.1.2 · Companion to `SPEC.md` (which wins on conflict)
+**Version:** 0.2.0 · Companion to `SPEC.md` (which wins on conflict)
 **Read order for any AI agent working here:** `AGENTS.md` → `SPEC.md` → this file.
 
 ---
@@ -58,6 +58,62 @@
 It consumes (a) the event ledger, (b) verifier output, (c) AO session state.
 Anything the ledger doesn't have is not "seen".
 
+### Graph execution + memory fabric (0.2.0)
+
+```
+                        ┌──────────────────────────────────┐
+                        │          FORGE COMMANDER         │
+                        │  ┌─────────────┐ ┌────────────┐  │
+   GoalSpec             │  │   GRAPH     │ │  MEMORY    │  │
+ ───────────────────►   │  │  SCHEDULER  │ │  FABRIC    │  │
+                        │  │ (typed nodes│ │ (context   │  │
+                        │  │  typed edges│ │  recall /  │  │
+                        │  │  judge rout)│ │  write)    │  │
+                        │  └──────┬──────┘ └─────┬──────┘  │
+                        └─────────┼──────────────┼─────────┘
+                                  │              │
+                                  ▼              ▼
+                  ┌──────────────────────────────────────┐
+                  │             NODE LAYER               │
+                  │  planner · specialist · judge        │
+                  │  verifier · reflector · evaluator    │
+                  │  aggregator                          │
+                  │                                      │
+                  │  each node:                          │
+                  │   ① recall relevant memory           │
+                  │   ② execute (tools / AO worker)      │
+                  │   ③ write structured observations    │
+                  └──────────────────┬───────────────────┘
+                                     │
+                                     ▼
+                  ┌──────────────────────────────────────┐
+                  │            EVIDENCE LAYER            │
+                  │  event ledger (authoritative)        │
+                  │  Neatlogs (optional trace mirror)    │
+                  └──────────────────────────────────────┘
+```
+
+**Handoff rule (the context-loss fix):** nodes never pass raw transcripts to
+each other. A node writes structured `Observation`s to the memory fabric and
+the next node recalls only what is relevant to its own goal — bounded, linked,
+and provenance-tracked. The fabric is a peer of the scheduler, not a store
+below the nodes.
+
+**Module map (0.2.0):**
+
+| Module | Role | Status |
+|---|---|---|
+| `src/forge/graph.py` | Typed graph: `NodeSpec`, `GraphSpec`, edge types, `compile_goal_graph`, `to_taskgraph` | implemented |
+| `src/forge/memory.py` | Context fabric: `Observation`, `MemoryAdapter`, `LocalMemoryStub`, `render_recall` | implemented (local stub) |
+| `src/forge/fleet.py` | Scheduler/executor: dependencies, parallelism, deadlines, resume, memory wiring | implemented |
+| `src/forge/experiment.py` | Baseline → reflect → gate → learned comparison | implemented |
+| `src/forge/tooling.py` | Allowlisted tool registry with ledger-backed evidence | implemented |
+| `src/forge/playbook.py` | Validated playbook selection by task family | implemented |
+| `src/forge/harness.py` | Bounded harness contracts + promotion gate | implemented |
+| Recursive scheduler (subgraph expansion) | Planner nodes returning subgraphs | planned — see `docs/BUILD.md` |
+| Judge-as-routing nodes | `RoutingDecision` consumed by the scheduler | planned — see `docs/BUILD.md` |
+| Live Supermemory adapter | Real backend behind `MemoryAdapter` | planned — see `docs/BUILD.md` |
+
 ### Evidence boundary (2026-09-07)
 
 The diagram is the target topology, not a claim that every edge is live. AO
@@ -70,6 +126,37 @@ is a reflection sidecar outside AO. Neatlogs is verified on the real OpenAI
 probe, and trace readback); that does not establish full AO-worker trace
 coverage. Supermemory is a future external integration; local Forge files and
 the ledger remain authoritative for the current design.
+
+### Agent design principles (2026-09-14, from razorpay-agent vs ZapAI comparison)
+
+Forge's design is informed by a head-to-head comparison between our prior work
+(razorpay-agent: dual-agent commerce with LinUCB bandit, gated money path,
+in-memory state) and ZapAI (WhatsApp-native agentic commerce with real
+Shopify/Razorpay/WhatsApp integrations, Neon PG, Redis, 43 tests, 93 commits).
+
+The key lessons driving Forge's architecture:
+
+1. **Real integrations are non-negotiable.** ZapAI won on product completeness
+   because it connected to real systems (WhatsApp Cloud, Shopify, 10 Razorpay
+   modules, Neon PG, Redis). razorpay-agent's conceptual elegance (LinUCB +
+   property-fuzzed gate) didn't compensate for no external connections.
+2. **Persistence is a first-class requirement.** In-memory state = demo. Durable
+   storage with migrations and pooling is the floor for a real product.
+3. **LLM reasoning within guardrails, not advisory-only.** Gemini with tool
+   calling within deterministic safety bounds > scripted fallback.
+4. **Safety + integrations, not safety OR integrations.** Forge's gate remains
+   authoritative, but the agents it governs must connect to real systems.
+5. **Multi-tenant from day one.** Isolated credentials, onboarding wizard,
+   per-store settings.
+6. **Frontend is the product.** Conversation inspectors, audit explorers,
+   analytics dashboards, onboarding — not decorative.
+7. **Inventory locking is real.** Atomic Redis locks with timeout release.
+8. **Cryptographic audit trails are compliance infrastructure.** Hash chains,
+   Ed25519 checkpoints, RFC 8785 — not polish.
+9. **Scope = end-to-end journey.** Onboarding → catalog → negotiation →
+   settlement → analytics.
+10. **Tests cover integration scenarios.** Webhook verification, locking,
+    audit chains, multi-turn conversations.
 
 ## 2. Component contracts
 

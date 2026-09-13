@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from forge.ao_cli import AOCommandResult, parse_spawn_output
-from forge.ao_runner import AORunRequest, AORunner
+from forge.ao_runner import AORunRequest, AORunner, session_snapshot
 from forge.watchdog import WorkerClassification
 
 
@@ -23,6 +24,17 @@ class FakeCLI:
             0,
             json.dumps({"session_id": "session-1", "worktree_path": str(self.worktree)}),
             "",
+        )
+
+
+class NonzeroSpawnCLI(FakeCLI):
+    def spawn(self, *, project: str, name: str, prompt: str, harness: str, mode: str):
+        self.spawn_calls.append({"project": project, "name": name, "prompt": prompt, "harness": harness, "mode": mode})
+        return AOCommandResult(
+            ("ao", "spawn"),
+            1,
+            json.dumps({"session_id": "session-recovered", "worktree_path": str(self.worktree)}),
+            "AO reported an error after creating the worker",
         )
 
 
@@ -69,6 +81,51 @@ def test_parse_spawn_output_accepts_human_readable_result(tmp_path: Path):
     assert result.worktree == tmp_path
 
 
+def test_session_snapshot_normalizes_real_nested_ao_activity():
+    snapshot = session_snapshot(
+        {
+            "session": {
+                "id": "forge-11",
+                "status": "working",
+                "createdAt": "2026-09-07T21:36:06.107342854Z",
+                "activity": {
+                    "state": "active",
+                    "lastActivityAt": "2026-09-07T21:36:13.662777385Z",
+                },
+            }
+        },
+        session_id="forge-11",
+        now=datetime(2026, 9, 7, 21, 36, 43, tzinfo=timezone.utc),
+    )
+    assert snapshot.status == "working"
+    assert snapshot.activity_state == "active"
+    assert snapshot.elapsed_s > 36
+    assert snapshot.last_activity_s > 29
+
+
+def test_runner_stops_on_runtime_budget_and_kills_worker(tmp_path: Path):
+    cli = FakeCLI(tmp_path)
+    client = FakeClient([{"id": "session-budget", "status": "working", "elapsed_s": 0, "last_activity_s": 0}])
+    result = AORunner(
+        ao_cli=cli,
+        ao_client=client,
+        sleep_fn=lambda _: None,
+    ).run(
+        AORunRequest(
+            run_id="runner-budget",
+            goal="bounded worker",
+            project="forge",
+            worker_name="worker-budget",
+            prompt="Wait.",
+            max_polls=5,
+            max_runtime_s=0.000001,
+        )
+    )
+    assert result.status == "stopped"
+    assert result.reason == "runtime_budget_exceeded"
+    assert client.killed == ["session-1"]
+
+
 def test_runner_passes_only_after_artifact_and_verifier(tmp_path: Path):
     artifact = tmp_path / "result.json"
     cli = FakeCLI(tmp_path)
@@ -104,8 +161,175 @@ def test_runner_passes_only_after_artifact_and_verifier(tmp_path: Path):
     assert result.session_id == "session-1"
     assert verified == [artifact]
     assert client.sent == []
-    assert client.killed == []
+    assert client.killed == ["session-1"]
     assert {event.kind for event in result.events} >= {"spawn", "poll", "verdict"}
+
+
+def test_runner_reconciles_nonzero_spawn_with_session_output(tmp_path: Path):
+    artifact = tmp_path / "result.json"
+    cli = NonzeroSpawnCLI(tmp_path)
+    client = FakeClient(
+        [
+            {"id": "session-recovered", "status": "working", "elapsed_s": 1, "last_activity_s": 0},
+            {"id": "session-recovered", "status": "completed", "elapsed_s": 2, "last_activity_s": 0},
+        ],
+        artifact,
+    )
+    result = AORunner(
+        ao_cli=cli,
+        ao_client=client,
+        sleep_fn=lambda _: None,
+        independent_verifier=lambda _root, path: path.exists(),
+    ).run(
+        AORunRequest(
+            run_id="runner-recovered-spawn",
+            goal="recover side-effecting spawn",
+            project="forge",
+            worker_name="worker-recovered",
+            prompt="Create the artifact.",
+            artifact_path=Path("result.json"),
+            max_polls=3,
+        )
+    )
+    assert result.status == "passed"
+    assert result.session_id == "session-recovered"
+    assert any(event.kind == "spawn_result" for event in result.events)
+
+
+def test_runner_blocks_artifact_when_independent_verifier_is_missing(tmp_path: Path):
+    artifact = tmp_path / "result.json"
+    cli = FakeCLI(tmp_path)
+    client = FakeClient(
+        [
+            {"id": "session-1", "status": "working", "elapsed_s": 1, "last_activity_s": 0},
+            {"id": "session-1", "status": "completed", "elapsed_s": 2, "last_activity_s": 0},
+        ],
+        artifact,
+    )
+    result = AORunner(
+        ao_cli=cli,
+        ao_client=client,
+        sleep_fn=lambda _: None,
+    ).run(
+        AORunRequest(
+            run_id="runner-no-verifier",
+            goal="make an artifact",
+            project="forge",
+            worker_name="worker-no-verifier",
+            prompt="Create the artifact.",
+            artifact_path=Path("result.json"),
+            max_polls=2,
+        )
+    )
+
+    assert result.status == "blocked"
+    assert result.artifact_exists is True
+    assert result.verification_passed is False
+    assert result.reason == "independent_verifier_required"
+    assert any(event.kind == "verification_unavailable" for event in result.events)
+
+
+def test_runner_resumes_existing_session_without_spawning_duplicate(tmp_path: Path):
+    artifact = tmp_path / "result.json"
+    cli = FakeCLI(tmp_path)
+    client = FakeClient(
+        [
+            {"id": "session-resume", "status": "working", "elapsed_s": 1, "last_activity_s": 0},
+            {"id": "session-resume", "status": "completed", "elapsed_s": 2, "last_activity_s": 0},
+        ],
+        artifact,
+    )
+    result = AORunner(
+        ao_cli=cli,
+        ao_client=client,
+        sleep_fn=lambda _: None,
+        independent_verifier=lambda _root, path: path.exists(),
+    ).run(
+        AORunRequest(
+            run_id="runner-resume",
+            goal="resume the existing worker",
+            project="forge",
+            worker_name="worker-resume",
+            prompt="Continue the existing task.",
+            artifact_path=Path("result.json"),
+            existing_session_id="session-resume",
+            worktree=tmp_path,
+            max_polls=3,
+        )
+    )
+
+    assert result.status == "passed"
+    assert result.session_id == "session-resume"
+    assert cli.spawn_calls == []
+    assert any(event.kind == "resume" for event in result.events)
+
+
+def test_runner_rejects_preexisting_unchanged_artifact(tmp_path: Path):
+    artifact = tmp_path / "result.json"
+    artifact.write_text("stale\n")
+    cli = FakeCLI(tmp_path)
+
+    class CompletedClient:
+        def session(self, session_id: str):
+            return {"id": session_id, "status": "completed", "elapsed_s": 1, "last_activity_s": 0}
+
+        def send(self, session_id: str, message: str):
+            return {"ok": True}
+
+        def kill(self, session_id: str):
+            return {"ok": True}
+
+    result = AORunner(
+        ao_cli=cli,
+        ao_client=CompletedClient(),
+        sleep_fn=lambda _: None,
+        independent_verifier=lambda _root, path: path.exists(),
+    ).run(
+        AORunRequest(
+            run_id="runner-stale-artifact",
+            goal="produce a fresh artifact",
+            project="forge",
+            worker_name="worker-stale-artifact",
+            prompt="Replace the stale artifact.",
+            artifact_path=Path("result.json"),
+            max_polls=2,
+        )
+    )
+
+    assert result.status == "blocked"
+    assert result.reason == "stale_artifact"
+    assert result.verification_passed is False
+
+
+def test_runner_closes_verified_session_and_records_cleanup(tmp_path: Path):
+    artifact = tmp_path / "result.json"
+    cli = FakeCLI(tmp_path)
+    client = FakeClient(
+        [
+            {"id": "session-close", "status": "working", "elapsed_s": 1, "last_activity_s": 0},
+            {"id": "session-close", "status": "completed", "elapsed_s": 2, "last_activity_s": 0},
+        ],
+        artifact,
+    )
+    result = AORunner(
+        ao_cli=cli,
+        ao_client=client,
+        sleep_fn=lambda _: None,
+        independent_verifier=lambda _root, path: path.exists(),
+    ).run(
+        AORunRequest(
+            run_id="runner-close",
+            goal="make and close",
+            project="forge",
+            worker_name="worker-close",
+            prompt="Create the artifact.",
+            artifact_path=Path("result.json"),
+            max_polls=3,
+        )
+    )
+    assert result.status == "passed"
+    assert client.killed == ["session-1"]
+    assert any(event.kind == "cleanup" for event in result.events)
 
 
 def test_runner_nudges_hidden_block_then_kills(tmp_path: Path):

@@ -18,6 +18,17 @@ def test_goal_and_run_result_are_strict():
     with pytest.raises(Exception):
         GoalSpec.model_validate({"goal": "x", "repo": "/tmp/x", "acceptance": [], "harness": "x", "unknown": 1})
 
+
+def test_goal_spec_acceptance_commands_are_explicit_and_bounded():
+    goal = GoalSpec(
+        goal="verify",
+        repo="/tmp/x",
+        acceptance=["pytest passes"],
+        harness="opencode",
+        verifier_commands=[["pytest", "-q"]],
+    )
+    assert goal.verifier_commands == [["pytest", "-q"]]
+
     result = RunResult(
         run_id="r1", goal="x", condition="C0", harness="opencode",
         status="passed", checks=[], wall_s=1.2,
