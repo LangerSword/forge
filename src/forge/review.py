@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .fleet import FleetController
+from .ao_runner import AORunner
 from .graph import GraphSpec, NodeSpec, to_taskgraph
 from .harness import EvaluationEvidence, GateVerdict, evaluate_candidate
 from .ledger import Ledger
@@ -469,16 +470,191 @@ def routing_suite(ledger: Ledger, *, run_id: str = "review-routing") -> dict[str
 # Full review
 # --------------------------------------------------------------------------
 
+# --------------------------------------------------------------------------
+# Suite 4: harness policy boundary sweep
+# --------------------------------------------------------------------------
+
+# Oracle table: request overrides -> the field the policy must reject (or
+# None for a request that must pass). The documented rule, independent of
+# the runner implementation.
+_POLICY_CASES: list[dict[str, Any]] = [
+    {"name": "within-policy", "overrides": {}, "violates": None},
+    {"name": "provider-prefix-model", "overrides": {"model": "nvidia/abacusai/dracarys-llama-3.1-70b-instruct"}, "violates": None},
+    {"name": "default-model", "overrides": {"model": None}, "violates": None},
+    {"name": "exact-model", "overrides": {"model": "deepseek/deepseek-v4-flash"}, "violates": None},
+    {"name": "nonallowlisted-model", "overrides": {"model": "sketchy-model"}, "violates": "model"},
+    {"name": "wrong-harness", "overrides": {"harness": "codex"}, "violates": "harness"},
+    {"name": "wrong-mode", "overrides": {"mode": "tui"}, "violates": "mode"},
+    {"name": "runtime-over", "overrides": {"max_runtime_s": 3600.0}, "violates": "runtime"},
+    {"name": "polls-over", "overrides": {"max_polls": 500}, "violates": "polls"},
+    {"name": "interval-over", "overrides": {"poll_interval_s": 60.0}, "violates": "interval"},
+    {"name": "idle-over", "overrides": {"max_idle_s": 600.0}, "violates": "idle"},
+]
+
+
+def _policy_suite_request(**overrides: Any) -> Any:
+    from .ao_runner import AORunRequest
+
+    defaults: dict[str, Any] = {
+        "run_id": "policy-suite",
+        "goal": "policy boundary sweep",
+        "project": "forge",
+        "worker_name": "w",
+        "prompt": "p",
+        "harness": "opencode",
+        "mode": "chat",
+        "max_polls": 40,
+        "poll_interval_s": 2.0,
+        "max_runtime_s": 300.0,
+        "max_idle_s": 90.0,
+    }
+    defaults.update(overrides)
+    return AORunRequest(**defaults)
+
+
+def policy_suite(
+    ledger: Ledger,
+    *,
+    run_id: str = "review-policy",
+    runner_factory: Callable[[Any, Any], Any] | None = None,
+    policy: Any | None = None,
+) -> dict[str, Any]:
+    """Grade the harness policy contract AND its enforcement order.
+
+    Two properties per case, against the oracle table (the documented rule):
+
+    - ``validate_correct`` — the policy accepts/rejects exactly the oracle's
+      expectation, naming the violating field.
+    - ``enforced_before_spawn`` — through a real runner: a violating request
+      must raise BEFORE any spawn executes. Spawn is observed through the
+      suite's recording CLI, which the runner receives via
+      ``runner_factory(cli, client)`` — so a runner that spawns before
+      validating is DETECTED, not silently re-graded green.
+    """
+    from .ao_cli import AOCommandResult
+    from .harness_policy import HarnessPolicy, HarnessPolicyError, policy_hash
+
+    if policy is None:
+        policy = HarnessPolicy(
+            harness="opencode",
+            allowed_models=("nvidia/", "deepseek/", None),
+            max_polls=120,
+            max_runtime_s=900.0,
+        )
+
+    class RecordingCLI:
+        """Observable spawn seam: records every model that reaches spawn."""
+
+        def __init__(self) -> None:
+            self.spawn_calls: list[str | None] = []
+
+        def spawn_command(self, **kwargs: Any):
+            return ("ao", "spawn")
+
+        def spawn(self, **kwargs: Any):
+            self.spawn_calls.append(kwargs.get("model"))
+            return AOCommandResult(("ao", "spawn"), 0, "", "")
+
+    class ExitedClient:
+        def session(self, session_id: str) -> dict[str, Any]:
+            return {"id": session_id, "status": "exited", "isTerminated": True}
+
+        def send(self, session_id: str, message: str) -> dict[str, Any]:
+            return {"ok": True}
+
+        def kill(self, session_id: str) -> dict[str, Any]:
+            return {"ok": True}
+
+    cli = RecordingCLI()
+    client = ExitedClient()
+    if runner_factory is None:
+        runner = AORunner(ao_cli=cli, ao_client=client)  # type: ignore[arg-type]
+    else:
+        runner = runner_factory(cli, client)
+    assert runner is not None
+
+    cases: list[ScoredCase] = []
+    for spec in _POLICY_CASES:
+        request = _policy_suite_request(**spec["overrides"])
+        failures: list[str] = []
+        spawns_before = len(cli.spawn_calls)
+
+        # Property 1: policy validation matches the oracle exactly.
+        validate_correct = True
+        if spec["violates"] is None:
+            try:
+                policy.validate_request(request)
+            except HarnessPolicyError as exc:
+                validate_correct = False
+                failures.append(f"expected pass, got violation: {exc}")
+        else:
+            try:
+                policy.validate_request(request)
+                validate_correct = False
+                failures.append(f"expected {spec['violates']!r} violation, got pass")
+            except HarnessPolicyError as exc:
+                if spec["violates"] not in str(exc):
+                    validate_correct = False
+                    failures.append(
+                        f"expected violation naming {spec['violates']!r}, got: {exc}"
+                    )
+
+        # Property 2: through the runner, violations raise BEFORE spawn —
+        # observed via the recording CLI, not just the exception type.
+        enforced_before_spawn = True
+        try:
+            runner.run(request, policy=policy)
+        except HarnessPolicyError:
+            pass  # rejected — but only correct if spawn never executed
+        except Exception as exc:  # noqa: BLE001
+            enforced_before_spawn = False
+            failures.append(f"runner raised {type(exc).__name__}, not HarnessPolicyError")
+        else:
+            if spec["violates"] is not None:
+                enforced_before_spawn = False
+                failures.append(
+                    f"violating request ({spec['violates']}) reached spawn without rejection"
+                )
+        spawned_during = cli.spawn_calls[spawns_before:]
+        if spec["violates"] is not None and spawned_during:
+            enforced_before_spawn = False
+            failures.append(
+                f"violating model {spawned_during[0]!r} reached spawn"
+            )
+
+        cases.append(ScoredCase(
+            suite="policy",
+            name=f"policy:{spec['name']}",
+            dims={
+                "validate_correct": validate_correct,
+                "enforced_before_spawn": enforced_before_spawn,
+            },
+            failure="; ".join(failures) if failures else None,
+        ))
+
+    summary = _summary(cases)
+    summary["policy_hash"] = policy_hash(policy)
+    _persist(ledger, run_id, "policy", cases, summary)
+    return {
+        "suite": "policy",
+        "total_cases": len(cases),
+        "summary": summary,
+        "cases": [case.to_dict() for case in cases],
+    }
+
+
 def run_review(ledger: Ledger, *, run_id: str = "review") -> dict[str, Any]:
-    """Run all three suites against one ledger and report per-suite rates."""
+    """Run all four suites against one ledger and report per-suite rates."""
     gate_report = gate_suite(ledger, run_id=run_id)
     verdict_report = verify_controller_verdicts(ledger, run_id=run_id)
     routing_report = routing_suite(ledger, run_id=run_id)
+    policy_report = policy_suite(ledger, run_id=run_id)
 
     suites = {
         gate_report["suite"]: gate_report,
         verdict_report["suite"]: verdict_report,
         routing_report["suite"]: routing_report,
+        policy_report["suite"]: policy_report,
     }
     all_suites_100 = all(
         report["summary"]["all_dimensions_100"] for report in suites.values()

@@ -8,6 +8,7 @@ import pytest
 
 from forge.graph import GraphSpec, NodeSpec
 from forge.harness import EvaluationEvidence, GateVerdict
+from forge.harness_policy import HarnessPolicyError
 from forge.ledger import Ledger
 from forge.review import (
     expected_gate_status,
@@ -166,7 +167,7 @@ def test_review_run_persists_to_ledger(tmp_path: Path) -> None:
     assert "review_summary" in kinds
     assert ledger.get_run("review-full")["status"] == "passed"
     assert result["all_suites_100"] is True
-    assert set(result["suites"].keys()) == {"gate", "verdict", "routing"}
+    assert set(result["suites"].keys()) == {"gate", "verdict", "routing", "policy"}
 
 
 def test_cli_review_command_reports_suites(capsys) -> None:
@@ -180,5 +181,115 @@ def test_cli_review_command_reports_suites(capsys) -> None:
     assert code == 0
     assert out["ok"] is True
     assert out["all_suites_100"] is True
-    assert set(out["suites"].keys()) == {"gate", "verdict", "routing"}
+    assert set(out["suites"].keys()) == {"gate", "verdict", "routing", "policy"}
     assert out["suites"]["gate"]["summary"]["all_dimensions_100"] is True
+
+# --------------------------------------------------------------------------
+# Policy suite: the declared harness contract, boundary-swept
+# --------------------------------------------------------------------------
+
+
+def test_policy_oracle_matches_validate_request() -> None:
+    """Oracle: the documented rule — within policy passes, violations raise
+    with the violating field named."""
+    from dataclasses import replace
+
+    from forge.harness_policy import HarnessPolicy, validate_request
+
+    policy = HarnessPolicy(
+        harness="opencode", allowed_models=("nvidia/", None), max_runtime_s=900.0
+    )
+    # oracle table: (request-overrides, expected-violation-or-None)
+    cases = [
+        ({}, None),
+        ({"model": "nvidia/abacusai/dracarys-llama-3.1-70b-instruct"}, None),
+        ({"model": None}, None),
+        ({"model": "sketchy-model"}, "model"),
+        ({"harness": "codex"}, "harness"),
+        ({"mode": "tui"}, "mode"),
+        ({"max_runtime_s": 3600.0}, "runtime"),
+        ({"max_polls": 500}, "polls"),
+    ]
+    for overrides, expected_field in cases:
+        request = _policy_suite_request(**overrides)
+        if expected_field is None:
+            assert validate_request(request, policy) is True
+        else:
+            with pytest.raises(HarnessPolicyError, match=expected_field):
+                validate_request(request, policy)
+
+
+def _policy_suite_request(**overrides):
+    from forge.ao_runner import AORunRequest
+
+    defaults: dict = {
+        "run_id": "policy-suite",
+        "goal": "policy boundary sweep",
+        "project": "forge",
+        "worker_name": "w",
+        "prompt": "p",
+        "harness": "opencode",
+        "mode": "chat",
+        "max_polls": 40,
+        "poll_interval_s": 2.0,
+        "max_runtime_s": 300.0,
+        "max_idle_s": 90.0,
+    }
+    defaults.update(overrides)
+    return AORunRequest(**defaults)
+
+
+def test_policy_suite_sweeps_boundaries_and_persists(tmp_path: Path) -> None:
+    ledger = Ledger(tmp_path)
+    from forge.review import policy_suite
+
+    report = policy_suite(ledger, run_id="review-policy")
+
+    assert report["total_cases"] >= 8
+    assert report["summary"]["all_dimensions_100"] is True
+    assert report["summary"]["failure_count"] == 0
+    events = ledger.events_for_run("review-policy")
+    kinds = [e["kind"] for e in events]
+    assert kinds.count("review_case") == report["total_cases"]
+    assert "review_summary" in kinds
+
+
+def test_policy_suite_detects_a_late_validating_runner(tmp_path: Path) -> None:
+    """The grader must fail: a runner that spawns BEFORE validating is caught
+    by the observable spawn seam (violating model reached spawn)."""
+    from types import SimpleNamespace
+
+    from forge.harness_policy import HarnessPolicy
+    from forge.review import policy_suite
+
+    def late_runner_factory(cli, client):
+        class LateRunner:
+            """Simulates a regression: spawns first, validates after."""
+
+            def run(self, request, *, policy=None):  # noqa: ANN001
+                cli.spawn(model=request.model)  # reaches spawn BEFORE validating
+                if policy is not None:
+                    policy.validate_request(request)  # too late
+                return SimpleNamespace(
+                    status="failed", classification=None, session_id="s",
+                    worktree=None, artifact_exists=False,
+                    verification_passed=False, reason="scripted",
+                )
+
+        return LateRunner()
+
+    policy = HarnessPolicy(
+        harness="opencode", allowed_models=("nvidia/", None), max_runtime_s=900.0
+    )
+    ledger = Ledger(tmp_path)
+    report = policy_suite(
+        ledger, run_id="review-policy-late", runner_factory=late_runner_factory
+    )
+
+    assert report["summary"]["all_dimensions_100"] is False
+    assert report["summary"]["failure_count"] > 0
+    # failures must name the violating model that reached spawn
+    assert any(
+        case.get("failure") and "reached spawn" in case["failure"]
+        for case in report["cases"]
+    )
