@@ -70,16 +70,21 @@ observed:
   persists task-attempt checkpoints with compare-and-set transitions, resumes
   known sessions without duplicate spawn, cleans up verified sessions, and
   enforces fleet runtime budgets.
-- **Live AO boundary (observed blocker):** a real OpenCode worker session was
-  spawned and recovered through AO, but produced no changed files or requested
-  artifact after one bounded nudge. Forge classified it as `no_op`, terminated
-  it, and recorded `failed`; this is not autonomous completion evidence.
+- **Live AO boundary (resolved 2026-09-15):** an earlier attempt (Sep 7) was a
+  no-op. On 2026-09-15, two bounded live spawns through Forge's real runner
+  produced fresh, independently verified artifacts — session `forge-13`
+  (verifier bug, caught) and `forge-14` (`ao-live-smoke-20260915-v2`,
+  `docs/SMOKE.md`, sha256 `1b37e8cb…`, verdict `passed`, session cleaned up).
+  Exact payload and completion signal recorded in `.forge/ao-surface.json`
+  `forge_daemon`.
 
-- **AO autonomous execution (core target):** Forge is intended to plan, spawn,
-  monitor, and verify AO workers without hidden controller work. AO health,
-  readiness, and read-only catalog/session surfaces are observed, but Forge's
-  exact spawn payload and reliable worker-completion/lifecycle signal are not
-  yet verified. No end-to-end autonomous AO execution claim is made.
+- **AO autonomous execution — verified (one bounded run):** Forge spawns,
+  monitors, and verifies AO workers with no hidden controller work. The exact
+  spawn payload, worktree discovery, artifact-fingerprint freshness check,
+  independent verification, watchdog classification (`working` → `passed`),
+  cleanup kill, and terminal verdict are all observed live. This proves a
+  single bounded autonomous completion; multi-worker fleet runs and
+  cross-harness transfer are still unproven and are not claimed.
 - **Cross-harness transfer (core target):** a validated skill is intended to be
   handed to a fresh worker through the same context-package contract while the
   execution harness changes. The live AO setup currently has only OpenCode

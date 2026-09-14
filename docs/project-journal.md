@@ -700,3 +700,55 @@ the same deterministic oracle. Live AO completion and cross-harness transfer
 remain unproven.
 
 ---
+
+## 2026-09-15 — Live AO autonomous completion verified (ao-live-smoke-20260915-v2)
+
+- **Type:** milestone / live proof point
+- **Status:** observed (two bounded live spawns; one clean `passed` verdict)
+- **Agents/harnesses:** AO daemon (ready, `:3001`, pid 36164), opencode worker
+  (chat mode), Forge `AORunner` + watchdog + verifier authority
+- **Scope:** `evals/results/live-smoke-2026-09-15.json`, `.forge/ao-surface.json`
+  `forge_daemon`, ledger runs `ao-live-smoke-20260915` / `-v2`
+
+### What was proven
+
+The blocked "AO autonomous execution" proof point landed:
+
+1. Daemon ready; Forge resolves the live daemon binary via `/proc`
+   (after the `resolve_binary` gating fix, commit `c0d53ec`).
+2. Spawn: exact payload recorded (prompt redacted), exit 0, session
+   `forge-14`, worktree discovered via branch match
+   `refs/heads/ao/forge-14/root` → `.ao/data/worktrees/forge/forge-14`.
+3. Bounded work: polls 1–4 `working/active`, artifact absent; poll 5
+   `docs/SMOKE.md` exists, fingerprint fresh.
+4. Independent verification: content check (SMOKE + date, bounded size) —
+   `verification_passed: true`.
+5. Watchdog: `working` → `passed` ("artifact and independent verification
+   passed"); cleanup kill with reason `verified_artifact`; final verdict
+   `passed`. ~11.5s spawn-to-verified. Session `exited/terminated`.
+
+### The v1 lesson: the grader must be able to see its own errors
+
+Attempt 1 (`forge-13`) produced the **byte-identical fresh artifact**
+(same sha256) — the worker was correct. But the one-off verifier called
+`Path.read_text(timeout=5)`; `Path.read_text()` takes no `timeout` kwarg, so
+every call raised `TypeError` and the `except` swallowed it to `False`. The
+runner faithfully reported `verification_passed: false` on all 40 polls and
+killed at poll budget. Manually reading the artifact showed the correct
+content. Root cause: swallowed exception in the verifier, not the agent, the
+runner, or AO. Fixed (`read_text()`), re-ran as v2, clean pass. Same class as
+the skill's pitfall list: a silent grader failure reads as an agent failure.
+
+### Evidence
+
+```text
+evals/results/live-smoke-2026-09-15.json  → status passed, verification true
+ledger runs ao-live-smoke-20260915(-v2)   → full event traces
+.forge/ao-surface.json forge_daemon       → payload + completion signal
+AO session forge-14                       → exited, isTerminated true
+```
+
+### What stays open
+
+Cross-harness transfer (only opencode authorized), multi-worker fleet runs,
+live Supermemory backend. No claims beyond one bounded autonomous completion.

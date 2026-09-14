@@ -35,11 +35,17 @@ claim is made.
 
 ## Status and evidence boundary
 
-- **AO autonomous execution — blocked proof:** AO health/readiness, live CLI
-  spawn output, session IDs, branch-based worktree discovery, activity
-  normalization, bounded nudge/kill, and cleanup are observed. The final live
-  worker was a no-op with no artifact, so reliable artifact-producing
-  autonomous completion is still unverified.
+- **AO autonomous execution — verified (live, bounded, 2026-09-15):** the
+  full path is observed end-to-end: live daemon ready (`:3001`), Forge
+  resolving the daemon binary, spawn → worktree discovery → bounded worker
+  work → fresh artifact → independent content verification → verdict `passed`
+  → session cleanup. Run `ao-live-smoke-20260915-v2` (session `forge-14`,
+  opencode, ~11.5s spawn-to-verified, sha256 `1b37e8cb…`, exact payload and
+  completion signal in `.forge/ao-surface.json` `forge_daemon`). A first
+  attempt (`forge-13`) also produced the identical fresh artifact; its
+  one-off verifier had a swallowed `TypeError`, caught and fixed before the
+  clean pass. This proves one bounded autonomous completion, not a fleet or
+  cross-harness claim — those remain open.
 - **Cross-harness transfer — target:** the portable context-package contract is
   designed for a fresh worker on a different AO harness. Only OpenCode is
   currently observed authorized in AO, so no transfer result is claimed.
