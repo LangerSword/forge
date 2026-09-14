@@ -179,6 +179,7 @@ def to_taskgraph(graph: GraphSpec) -> TaskGraph:
                 acceptance=list(node.acceptance),
                 deps=list(node.deps),
                 artifact_path=node.artifact_path,
+                tools=list(node.tools),
             )
             for node in graph.nodes
         ],

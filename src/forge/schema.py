@@ -43,6 +43,7 @@ class TaskSpec(BaseModel):
     artifact_path: str | None = Field(default=None, min_length=1)
     mode: str = Field(default="chat", min_length=1)
     context_refs: list[str] = Field(default_factory=list, max_length=32)
+    tools: list[str] = Field(default_factory=list, max_length=32)
 
 
 class TaskGraph(BaseModel):
