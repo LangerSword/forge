@@ -319,7 +319,10 @@ class FleetController:
                 context = self.context_for(goal, task, run_id=task_run_id)
                 memory_block = ""
                 if self.memory is not None:
-                    recalled = self.memory.recall(query=task.goal, task_family=task.task_id, limit=5)
+                    # Recall is semantic across the whole fabric. Do NOT filter
+                    # by task_id: an instance id is not a task family, and
+                    # filtering by it defeats cross-run context entirely.
+                    recalled = self.memory.recall(query=task.goal, limit=5)
                     memory_block = render_recall(recalled)
                     self.ledger.event(run_id, "memory_recall", "controller", {
                         "task_id": task_id,
@@ -483,10 +486,16 @@ class FleetController:
                         },
                     )
                     if self.memory is not None:
+                        # Observations must carry WHAT the work was about, or
+                        # semantic recall by a later goal can never match them.
+                        goal_snippet = by_id[task_id].goal[:160] if task_id in by_id else ""
                         self.memory.write(Observation(
                             node_id=outcome.run_id,
                             kind="outcome",
-                            description=f"task {task_id} {outcome.status}: {outcome.reason or 'no reason recorded'}",
+                            description=(
+                                f"task {task_id} {outcome.status} for goal '{goal_snippet}': "
+                                f"{outcome.reason or 'no reason recorded'}"
+                            ),
                             task_family=task_id,
                             evidence_refs=(f"run:{outcome.run_id}",),
                             activation="high",

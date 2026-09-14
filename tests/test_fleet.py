@@ -524,3 +524,72 @@ def test_controller_without_memory_emits_no_memory_events(tmp_path: Path) -> Non
     kinds = {event["kind"] for event in controller.ledger.events_for_run("fleet-no-memory")}
     assert "memory_recall" not in kinds
     assert "memory_write" not in kinds
+
+
+def test_controller_recall_crosses_family_boundaries(tmp_path: Path) -> None:
+    """Regression: task recall is semantic, not filtered by the task's own id.
+
+    The bug: recall passed task_id as a 'task family', so a task could never
+    recall context written under any other family — defeating cross-run memory.
+    """
+    from forge.memory import LocalMemoryStub, Observation
+
+    memory = LocalMemoryStub()
+    memory.write(Observation(
+        node_id="earlier-run",
+        kind="outcome",
+        description="shadow the frosted glass cards pattern from the style guide",
+        task_family="some-other-family",
+    ))
+    prompts: list[str] = []
+
+    def runner_factory(request):
+        prompts.append(request.prompt)
+        return SimpleNamespace(
+            run=lambda req: SimpleNamespace(
+                status="passed",
+                session_id="session-cross-family",
+                worktree=tmp_path,
+                artifact_exists=True,
+                verification_passed=True,
+                classification=SimpleNamespace(value="passed"),
+                reason="completed",
+            )
+        )
+
+    controller = FleetController(tmp_path, runner_factory=runner_factory, memory=memory)
+    report = controller.run(goal(), TaskGraph(tasks=[task("a")]), run_id="fleet-cross-family")
+
+    assert report.status == "passed"
+    assert "frosted glass cards" in prompts[0]
+
+
+def test_controller_outcome_observation_recalls_by_goal(tmp_path: Path) -> None:
+    """Regression: written observations must be recallable by the task's goal.
+
+    The bug: the outcome description was 'task <id> passed: <reason>' — it did
+    not carry the goal text, so semantic recall by goal could never match it.
+    """
+    from forge.memory import LocalMemoryStub
+
+    memory = LocalMemoryStub()
+    controller = FleetController(
+        tmp_path,
+        runner_factory=lambda request: SimpleNamespace(
+            run=lambda req: SimpleNamespace(
+                status="passed",
+                session_id="session-goal-text",
+                worktree=tmp_path,
+                artifact_exists=True,
+                verification_passed=True,
+                classification=SimpleNamespace(value="passed"),
+                reason="completed",
+            )
+        ),
+        memory=memory,
+    )
+    controller.run(goal(), TaskGraph(tasks=[task("a")]), run_id="fleet-goal-text")
+
+    recalled = memory.recall(query="complete a", limit=5)
+    assert recalled, "no observations written"
+    assert any("complete a" in observation.description for observation in recalled)

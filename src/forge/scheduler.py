@@ -19,6 +19,7 @@ Determinism rules:
 """
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 from time import monotonic
 from typing import Any, Callable
@@ -26,6 +27,7 @@ from typing import Any, Callable
 from .fleet import FleetController
 from .graph import GraphRunResult, GraphSpec, NodeResult, NodeSpec, to_taskgraph
 from .ledger import Ledger
+from .memory import Observation, render_recall
 from .schema import GoalSpec
 
 _TERMINAL_STATUSES = ("passed", "failed", "blocked", "stopped")
@@ -40,7 +42,7 @@ class GraphScheduler:
         root: Path,
         *,
         runner_factory: Callable[[Any], Any],
-        planner: Callable[[NodeSpec], GraphSpec] | None = None,
+        planner: Callable[..., GraphSpec] | None = None,
         judge: Callable[[NodeSpec, NodeResult], Any] | None = None,
         memory: Any | None = None,
         clock: Callable[[], float] = monotonic,
@@ -98,7 +100,19 @@ class GraphScheduler:
         effective_goal = goal or self._synthetic_goal(graph)
 
         for node in planner_nodes:
-            subgraph = self.planner(node) if self.planner is not None else None
+            memory_context = ""
+            if self.memory is not None:
+                # Recall is semantic across the whole fabric. Do NOT filter by
+                # node_id: an instance id is not a task family, and filtering by
+                # it would stop a run from ever recalling prior runs' context.
+                recalled = self.memory.recall(query=node.goal, limit=5)
+                memory_context = render_recall(recalled)
+                self.ledger.event(graph_id, "memory_recall", "scheduler", {
+                    "node_id": node.node_id,
+                    "count": len(recalled),
+                    "rendered_chars": len(memory_context),
+                })
+            subgraph = self._expand_planner(node, memory_context)
             if subgraph is None:
                 raise ValueError(f"planner produced no subgraph for node '{node.node_id}'")
             self.ledger.event(graph_id, "planner_expanded", "scheduler", {
@@ -119,6 +133,23 @@ class GraphScheduler:
                 evidence_refs=(f"graph:{graph_id}:{node.node_id}",),
                 subgraph=sub_result,
             )
+            if self.memory is not None:
+                self.memory.write(Observation(
+                    node_id=f"{graph_id}:{node.node_id}",
+                    kind="outcome",
+                    description=(
+                        f"planner {node.node_id} {sub_result.status} for goal "
+                        f"'{node.goal[:160]}': expanded into {len(subgraph.nodes)} nodes"
+                    ),
+                    task_family=node.node_id,
+                    evidence_refs=(f"graph:{graph_id}:{node.node_id}",),
+                    activation="high",
+                ))
+                self.ledger.event(graph_id, "memory_write", "scheduler", {
+                    "node_id": node.node_id,
+                    "kind": "outcome",
+                    "status": sub_result.status,
+                })
 
         if work_nodes:
             dispatch = self._strip_satisfied_deps(work_nodes, planner_ids)
@@ -147,6 +178,23 @@ class GraphScheduler:
             "depth": depth,
         })
         self.ledger.update_run_status(graph_id, status)
+        if self.memory is not None:
+            self.memory.write(Observation(
+                node_id=graph_id,
+                kind="outcome",
+                description=(
+                    f"graph {graph_id} {status} for goal '{graph.rationale[:160]}': "
+                    f"{len(results)} nodes at depth {depth}"
+                ),
+                task_family=graph_id,
+                evidence_refs=(f"graph:{graph_id}",),
+                activation="high",
+            ))
+            self.ledger.event(graph_id, "memory_write", "scheduler", {
+                "node_id": graph_id,
+                "kind": "outcome",
+                "status": status,
+            })
         return GraphRunResult(graph_id=graph_id, status=status, node_results=tuple(results))
 
     def _apply_routing(
@@ -215,6 +263,50 @@ class GraphScheduler:
                 observations=(reason,) if reason else (),
                 evidence_refs=(f"graph:{graph_id}:{judge_node.node_id}",),
             )
+            if self.memory is not None:
+                self.memory.write(Observation(
+                    node_id=f"{graph_id}:{judge_node.node_id}",
+                    kind="decision",
+                    description=(
+                        f"judge {judge_node.node_id} on {judged_id}: {decision} ({reason})"
+                    ),
+                    task_family=judged_id,
+                    evidence_refs=(f"graph:{graph_id}:{judge_node.node_id}",),
+                    activation="high",
+                ))
+                self.ledger.event(graph_id, "memory_write", "scheduler", {
+                    "node_id": judge_node.node_id,
+                    "kind": "decision",
+                    "decision": decision,
+                })
+
+    def _expand_planner(self, node: NodeSpec, memory_context: str) -> GraphSpec | None:
+        """Call the planner with recalled context when it accepts a second argument.
+
+        Signature detection is deterministic (inspect.signature), so a one-arg
+        planner keeps working unchanged and a two-arg planner receives the
+        rendered recall block.
+        """
+        if self.planner is None:
+            return None
+        if not self._planner_accepts_context():
+            return self.planner(node)
+        return self.planner(node, memory_context)
+
+    def _planner_accepts_context(self) -> bool:
+        if self.planner is None:
+            return False
+        try:
+            parameters = list(inspect.signature(self.planner).parameters.values())
+        except (TypeError, ValueError):
+            return False
+        positional = [
+            parameter
+            for parameter in parameters
+            if parameter.kind
+            in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
+        ]
+        return len(positional) >= 2
 
     def _strip_satisfied_deps(
         self, nodes: list[NodeSpec], planner_ids: set[str]
