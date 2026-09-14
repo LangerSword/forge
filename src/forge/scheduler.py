@@ -66,7 +66,11 @@ class GraphScheduler:
         graph_id: str,
         goal: GoalSpec | None = None,
         depth: int = 0,
+        resume: bool = False,
     ) -> GraphRunResult:
+        """Execute a graph. With ``resume=True``, nodes already checkpointed as
+        ``passed`` are reused instead of re-executed (work nodes only; planner
+        re-expansion is not yet checkpointed)."""
         if depth > self.max_depth:
             raise ValueError(f"max_depth {self.max_depth} exceeded at depth {depth}")
 
@@ -151,11 +155,45 @@ class GraphScheduler:
                     "status": sub_result.status,
                 })
 
+        node_priors: dict[str, str] = {}
+        work_attempt: int | None = None
         if work_nodes:
             dispatch = self._strip_satisfied_deps(work_nodes, planner_ids)
-            results_by_id.update(
-                self._run_work(dispatch, effective_goal, f"{graph_id}:work", graph.max_parallel)
-            )
+            skipped_ids: set[str] = set()
+            if resume:
+                for node in dispatch:
+                    row = self.ledger.get_graph_node(graph_id, node.node_id)
+                    if row is not None and row["status"] == "passed":
+                        results_by_id[node.node_id] = NodeResult(
+                            node_id=node.node_id,
+                            status="passed",
+                            evidence_refs=(row.get("evidence_ref") or f"graph:{graph_id}",),
+                        )
+                        skipped_ids.add(node.node_id)
+                        self.ledger.event(graph_id, "node_resumed", "scheduler", {
+                            "node_id": node.node_id,
+                            "status": "passed",
+                        })
+            remaining = [node for node in dispatch if node.node_id not in skipped_ids]
+            if remaining:
+                work_attempt = self._next_attempt(graph_id)
+                for node in remaining:
+                    row = self.ledger.get_graph_node(graph_id, node.node_id)
+                    if row is None:
+                        self.ledger.ensure_graph_node(
+                            graph_id, node.node_id, attempt=work_attempt
+                        )
+                        node_priors[node.node_id] = "pending"
+                    else:
+                        node_priors[node.node_id] = row["status"]
+                results_by_id.update(
+                    self._run_work(
+                        remaining,
+                        effective_goal,
+                        f"{graph_id}:work:{work_attempt}",
+                        graph.max_parallel,
+                    )
+                )
 
         if judge_nodes and self.judge is not None:
             self._apply_routing(
@@ -165,6 +203,27 @@ class GraphScheduler:
                 effective_goal=effective_goal,
                 nodes_by_id={node.node_id: node for node in graph.nodes},
             )
+
+        # Persist each node's FINAL status (after any judge retry/escalation) so a
+        # later resume can trust the checkpoint. Compare-and-set on the status we
+        # observed at dispatch time; a miss means a stale/unexpected writer.
+        for node_id, prior in node_priors.items():
+            final = results_by_id.get(node_id)
+            if final is None:
+                continue
+            recorded = self.ledger.update_graph_node(
+                graph_id,
+                node_id,
+                expected_status=prior,
+                status=final.status,
+                attempt=work_attempt,
+                evidence_ref=final.evidence_refs[0] if final.evidence_refs else None,
+            )
+            if not recorded:
+                self.ledger.event(graph_id, "graph_node_cas_miss", "scheduler", {
+                    "node_id": node_id,
+                    "expected_status": prior,
+                })
 
         results = [
             results_by_id[node.node_id]
@@ -307,6 +366,13 @@ class GraphScheduler:
             in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
         ]
         return len(positional) >= 2
+
+    def _next_attempt(self, graph_id: str) -> int:
+        """Next attempt number for this graph: one past the highest on record."""
+        rows = self.ledger.list_graph_nodes(graph_id)
+        if not rows:
+            return 1
+        return max(int(row["attempt"]) for row in rows) + 1
 
     def _strip_satisfied_deps(
         self, nodes: list[NodeSpec], planner_ids: set[str]

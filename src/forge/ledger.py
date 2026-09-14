@@ -55,6 +55,15 @@ class Ledger:
         );
         CREATE INDEX IF NOT EXISTS task_attempts_latest
           ON task_attempts(run_id, task_id, attempt DESC);
+        CREATE TABLE IF NOT EXISTS graph_nodes(
+          run_id TEXT NOT NULL,
+          node_id TEXT NOT NULL,
+          status TEXT NOT NULL,
+          attempt INTEGER NOT NULL,
+          evidence_ref TEXT,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY(run_id, node_id)
+        );
         """)
         self.db.commit()
 
@@ -243,3 +252,68 @@ class Ledger:
                     item["verification_passed"] = bool(item["verification_passed"])
                 result.append(item)
             return result
+
+    def ensure_graph_node(
+        self,
+        run_id: str,
+        node_id: str,
+        *,
+        attempt: int,
+        status: str = "pending",
+        evidence_ref: str | None = None,
+    ) -> None:
+        """Create the checkpoint row for one graph node if it does not exist."""
+        with self._lock:
+            self.db.execute(
+                """INSERT OR IGNORE INTO graph_nodes
+                   (run_id, node_id, status, attempt, evidence_ref, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (run_id, node_id, status, attempt, evidence_ref, utc_now()),
+            )
+            self.db.commit()
+
+    def update_graph_node(
+        self,
+        run_id: str,
+        node_id: str,
+        *,
+        expected_status: str,
+        status: str,
+        attempt: int | None = None,
+        evidence_ref: str | None = None,
+    ) -> bool:
+        """Compare-and-set one graph node so stale writers cannot overwrite state."""
+        with self._lock:
+            cursor = self.db.execute(
+                """UPDATE graph_nodes
+                   SET status=?, attempt=COALESCE(?, attempt),
+                       evidence_ref=COALESCE(?, evidence_ref), updated_at=?
+                   WHERE run_id=? AND node_id=? AND status=?""",
+                (
+                    status,
+                    attempt,
+                    evidence_ref,
+                    utc_now(),
+                    run_id,
+                    node_id,
+                    expected_status,
+                ),
+            )
+            self.db.commit()
+            return cursor.rowcount == 1
+
+    def get_graph_node(self, run_id: str, node_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self.db.execute(
+                "SELECT * FROM graph_nodes WHERE run_id=? AND node_id=?",
+                (run_id, node_id),
+            ).fetchone()
+            return dict(row) if row is not None else None
+
+    def list_graph_nodes(self, run_id: str) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self.db.execute(
+                "SELECT * FROM graph_nodes WHERE run_id=? ORDER BY node_id",
+                (run_id,),
+            ).fetchall()
+            return [dict(row) for row in rows]
