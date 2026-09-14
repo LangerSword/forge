@@ -47,6 +47,7 @@ class AORunRequest:
     harness: str = "opencode"
     mode: str = "chat"
     condition: str = "C0"
+    model: str | None = None
     artifact_path: Path | None = None
     worktree: Path | None = None
     existing_session_id: str | None = None
