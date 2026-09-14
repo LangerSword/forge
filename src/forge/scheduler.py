@@ -44,6 +44,7 @@ class GraphScheduler:
         runner_factory: Callable[[Any], Any],
         planner: Callable[..., GraphSpec] | None = None,
         judge: Callable[[NodeSpec, NodeResult], Any] | None = None,
+        learning_hook: Callable[[GraphRunResult], list[str]] | None = None,
         memory: Any | None = None,
         clock: Callable[[], float] = monotonic,
         max_depth: int = 3,
@@ -53,6 +54,7 @@ class GraphScheduler:
         self.runner_factory = runner_factory
         self.planner = planner
         self.judge = judge
+        self.learning_hook = learning_hook
         self.memory = memory
         self.clock = clock
         self.max_depth = max_depth
@@ -254,7 +256,23 @@ class GraphScheduler:
                 "kind": "outcome",
                 "status": status,
             })
-        return GraphRunResult(graph_id=graph_id, status=status, node_results=tuple(results))
+        run_result = GraphRunResult(graph_id=graph_id, status=status, node_results=tuple(results))
+        # Learning runs only on failed graphs, after the graph is closed. The
+        # hook may return candidate ids ONLY — it can never change a node status
+        # or the run verdict. A broken reflector is recorded, never fatal.
+        if self.learning_hook is not None and status == "failed":
+            try:
+                candidates = list(self.learning_hook(run_result) or [])
+            except Exception as exc:  # boundary: reflection must not corrupt the run
+                self.ledger.event(graph_id, "reflection_error", "learning-sidecar", {
+                    "error_type": type(exc).__name__,
+                })
+            else:
+                self.ledger.event(graph_id, "reflection", "learning-sidecar", {
+                    "candidate_count": len(candidates),
+                    "status": "candidate_only",
+                })
+        return run_result
 
     def _apply_routing(
         self,

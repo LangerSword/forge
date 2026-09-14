@@ -513,9 +513,17 @@ class FleetController:
         candidates: list[str] = []
         report = FleetReport(run_id, status, outcomes, candidates, self.ledger, self.clock() - started)
         if self.learning_hook is not None:
-            candidates = list(self.learning_hook(report) or [])
-            report.learning_candidates = candidates
-            self.ledger.event(run_id, "reflection", "learning-sidecar", {"candidate_count": len(candidates), "status": "candidate_only"})
+            try:
+                candidates = list(self.learning_hook(report) or [])
+            except Exception as exc:
+                # A broken reflector must never leave the run non-terminal: the
+                # failure is recorded, the run still closes with its verdict.
+                self.ledger.event(run_id, "reflection_error", "learning-sidecar", {
+                    "error_type": type(exc).__name__,
+                })
+            else:
+                report.learning_candidates = candidates
+                self.ledger.event(run_id, "reflection", "learning-sidecar", {"candidate_count": len(candidates), "status": "candidate_only"})
         self.ledger.update_run_status(run_id, status)
         self.ledger.event(run_id, "verdict", "controller", {"status": status, "task_count": len(outcomes), "candidate_count": len(candidates)})
         return report

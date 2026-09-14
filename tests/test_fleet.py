@@ -593,3 +593,38 @@ def test_controller_outcome_observation_recalls_by_goal(tmp_path: Path) -> None:
     recalled = memory.recall(query="complete a", limit=5)
     assert recalled, "no observations written"
     assert any("complete a" in observation.description for observation in recalled)
+
+
+def test_controller_survives_learning_hook_exception(tmp_path: Path) -> None:
+    """Regression: a broken learning hook must not leave the run non-terminal.
+
+    The bug: the hook was called before the terminal status/verdict events, so a
+    raising hook aborted the run while it still said 'running' on disk.
+    """
+
+    def explode(report):
+        raise RuntimeError("reflector offline")
+
+    controller = FleetController(
+        tmp_path,
+        runner_factory=lambda request: SimpleNamespace(
+            run=lambda req: SimpleNamespace(
+                status="passed",
+                session_id="session-hook-error",
+                worktree=tmp_path,
+                artifact_exists=True,
+                verification_passed=True,
+                classification=SimpleNamespace(value="passed"),
+                reason="completed",
+            )
+        ),
+        learning_hook=explode,
+    )
+    report = controller.run(goal(), TaskGraph(tasks=[task("a")]), run_id="fleet-hook-error")
+
+    assert report.status == "passed"
+    stored = controller.ledger.get_run("fleet-hook-error")
+    assert stored["status"] == "passed"
+    kinds = [event["kind"] for event in controller.ledger.events_for_run("fleet-hook-error")]
+    assert "verdict" in kinds
+    assert "reflection_error" in kinds
