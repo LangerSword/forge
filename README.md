@@ -55,6 +55,14 @@ claim is made.
   `LocalMemoryStub` are implemented and wired into the fleet controller. A live
   Supermemory backend is not yet configured or read back; until it is, the
   local `.forge` registry, ledger, and stub remain authoritative.
+- **Deterministic review — verified scope:** `forge review`
+  (`src/forge/review.py`) grades Forge's own verdict systems against
+  independent, code-computed oracles — the promotion gate (1800-case boundary
+  sweep), the controller verifier-authority truth table, and the judge-routing
+  matrix — with per-case failure detail in the ledger. It exits nonzero unless
+  every dimension is 100%, is re-runnable, and detects a deliberately regressed
+  gate rather than re-grading it green. This grades Forge's decision systems;
+  it is not an LLM judge and proves nothing about live AO completion.
 
 The tracked C0 submission report records a failing baseline and a passing
 bounded repair, plus a `candidate` skill artifact; it explicitly does not claim
@@ -120,7 +128,10 @@ uv sync
 # 2. one run
 python -m forge.cli run evals/goals/<goal>.json --condition C0
 
-# 3. dashboard
+# 3. grade Forge's own verdict systems (deterministic oracles, no LLM judge)
+python -m forge.cli review
+
+# 4. dashboard
 python -m forge.cli dashboard
 ```
 

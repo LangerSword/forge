@@ -30,6 +30,7 @@ from .harness_readiness import build_harness_report
 from .openai_provider import OpenAIProvider, ProviderError
 from .submission import run_submission_mvp
 from .ledger import Ledger
+from .review import run_review
 from .schema import GoalSpec
 
 
@@ -238,6 +239,24 @@ def _default_task_executor():
     return SimpleExecutor()
 
 
+def cmd_review(run_id: str) -> int:
+    """Grade Forge's own verdict systems against deterministic oracles.
+
+    Exit code 0 only when every suite scores 100% on every dimension; the
+    per-suite reports (and each failing case) are persisted to the ledger.
+    """
+    result = run_review(Ledger(root()), run_id=run_id)
+    payload = {
+        "schema_version": "forge.review.v1",
+        "ok": result["all_suites_100"],
+        "run_id": run_id,
+        "all_suites_100": result["all_suites_100"],
+        "suites": result["suites"],
+    }
+    print(json.dumps(payload, indent=2, default=str))
+    return 0 if result["all_suites_100"] else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="forge")
     parser.add_argument("--version", action="version", version=__version__)
@@ -264,6 +283,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("experiments", help="list completed experiments")
     graph_cmd = sub.add_parser("graph", help="compile a goal into its typed execution graph")
     graph_cmd.add_argument("goal_file", help="path to GoalSpec JSON file")
+    review_cmd = sub.add_parser("review", help="grade Forge's own verdict systems against deterministic oracles")
+    review_cmd.add_argument("--run-id", default="review-suite")
     dash = sub.add_parser("dashboard")
     dash.add_argument("--port", type=int, default=8787)
     args = parser.parse_args(argv)
@@ -336,6 +357,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_experiments()
     if args.command == "graph":
         return cmd_graph(args.goal_file)
+    if args.command == "review":
+        return cmd_review(args.run_id)
     return 2
 
 

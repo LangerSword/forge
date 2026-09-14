@@ -637,3 +637,66 @@ remains applicable and is re-applied to Forge's own verdict-producing
 components instead. No history rewrite — a removal commit.
 
 ---
+
+## 2026-09-14 — Deterministic review of Forge's own verdict systems (0.2.3)
+
+- **Type:** milestone / evaluation harness
+- **Status:** observed (205 tests; deterministic oracles, no LLM judge; re-runnable)
+- **Agents/harnesses:** Forge core, pytest (local)
+- **Scope:** `src/forge/review.py`, `tests/test_review.py`, `forge review` CLI
+
+### What was built
+
+`src/forge/review.py` applies the agent-accuracy-grading methodology
+(Scenario Gen → system-under-test → grading fn → summary) to Forge's own
+verdict-producing components. The correct verdict for every case is COMPUTED
+from the inputs plus the documented rule (an oracle), never judged by an LLM:
+
+- **`gate_suite`** — 1800 cases sweeping the promotion gate's
+  `evaluate_candidate` boundaries: below/at/above every threshold, negative
+  trial counts, held-out missing/regression, <3 evidence refs, anon candidates.
+- **`verify_controller_verdicts`** — the controller's verifier-authority truth
+  table (worker status × fresh artifact × independent verification); a worker
+  pass counts only with both.
+- **`routing_suite`** — judge decision × retry budget through the *real*
+  scheduler: continue / retry (budget respected) / escalate / stop / invalid,
+  cross-checked against `expected_routing_outcome`.
+
+`run_review` persists every case and a per-dimension summary to the ledger with
+failure detail; `forge review` exits nonzero unless every dimension is 100%.
+
+### Bugs found by building the grader (all fixed at the root)
+
+- **`all_dimensions_100` was constant `False`.** `_summary` folded
+  `failure_count` (a raw count) into the same dict it ANDed to 1.0, so a
+  perfect suite was reported as failing and `run_review` always marked the run
+  `failed`. The flag is now computed over scored dimensions only.
+- **Non-idempotent suites.** Child executions wrote `verdict-N` / `routing-N`
+  runs into the *project* ledger, so a second `forge review` raised
+  `run already exists: verdict-1` and stale `graph_id` state made routing
+  retries fail. Child executions now run under a scratch root; the command is
+  re-runnable and the project ledger stays clean.
+- **Oracle/table mismatch on the invalid-decision case.** The suite scored
+  judged/graph as failing for the `raises` contract, which no correct
+  implementation could satisfy; the contract is now scored as declared.
+- **Vacuous fail-detection test.** The regressed-gate test iterated `None`
+  failures and asserted a substring the failure message never contained; it now
+  guards `None` and asserts the real message.
+
+### Evidence
+
+```text
+uv run pytest -q → 205 passed (12 new), green on repeat runs
+forge review --run-id review-cli-A → ok: true, all 3 suites 100%, exit 0 (x2)
+negative control: refs rule disabled → all_dimensions_100 False, 288 failures detected
+positive control: real gate → all_dimensions_100 True
+```
+
+### Interpretation / what stays open
+
+The grader is the infrastructure §9 item 3 needs: when a real (LLM) judge
+lands, it plugs into the routing suite and its decisions are measured against
+the same deterministic oracle. Live AO completion and cross-harness transfer
+remain unproven.
+
+---

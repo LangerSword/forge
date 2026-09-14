@@ -710,7 +710,13 @@ genuinely still open, in priority order:
    decision. The deterministic judge used in tests is a stub; an LLM judge
    (evidence sufficiency, tool choice, plan quality) is the next layer — and it
    must stay constrained by the same `continue/retry/reroute/escalate/stop`
-   vocabulary plus deterministic policy around it.
+   vocabulary plus deterministic policy around it. **The grader for Forge's own
+   verdict systems is already built:** `src/forge/review.py` scores the
+   promotion gate (1800-case boundary sweep), the controller truth table, and
+   the judge-routing matrix against independent, code-computed oracles
+   (`run_review`), persisting per-dimension rates and per-case failure detail —
+   see `forge review`. When a real (LLM) judge lands, its routing decisions plug
+   into the same `routing_suite` matrix and are measured, not asserted.
 4. **Verify the Supermemory adapter against the live service.** Endpoint
    shapes follow the documented pattern but have only been exercised against a
    fake client. Wire `build_memory_adapter()` into the CLI/scheduler entry

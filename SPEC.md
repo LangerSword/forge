@@ -1,6 +1,6 @@
 # Forge — Spec Sheet
 
-**Version:** 0.2.0 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-14
+**Version:** 0.2.3 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-14
 **Track:** Syndicate by Maximor — Track 1: Automated Agent Engineering
 **Deadline:** 2026-09-07 03:30 IST (Devpost)
 **Working dir:** `~/forge` · **Remote:** `https://github.com/LangerSword/forge`
@@ -592,3 +592,18 @@ unattended production deployment.
   different project. It did not grade Forge's own artifacts. Removed in
   `0.2.3`; the skill's methodology is instead applied to Forge's own decision
   systems (see 0.2.3).
+- **0.2.3** (2026-09-14): re-applied the agent-accuracy-grading methodology to
+  Forge's own verdict-producing components. `src/forge/review.py` grades three
+  systems against independent, code-computed oracles (no LLM judge):
+  the promotion gate (`evaluate_candidate`) over a 1800-case boundary sweep
+  (below/at/above every threshold, negative trial counts, held-out
+  missing/regression, <3 evidence refs, anon candidates); the controller's
+  verifier-authority truth table (worker status × fresh artifact × independent
+  verification); and the scheduler's judge-routing matrix
+  (continue/retry/escalate/stop/invalid) through the real scheduler.
+  `forge review` persists every case and a per-dimension summary to the ledger
+  with failure detail, and exits nonzero unless every dimension is 100%. Child
+  executions run under a scratch root, so the command is idempotent and does
+  not pollute the project ledger; a regressed gate is detected, not silently
+  re-graded green. 205 tests pass (12 new). Live AO completion and
+  cross-harness transfer remain unproven and are still stated as blockers.
