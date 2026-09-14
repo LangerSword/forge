@@ -108,14 +108,14 @@ done-when, and what to do when it fails.
 - **Task 1** — recursive scheduler (planner nodes expand into subgraphs) — ✅ DONE (commit `028cdc7`)
 - **Task 2** — judge-as-routing (a `RoutingDecision` changes what runs next) — ✅ DONE (commit `cff30e6`)
 - **Task 3** — memory fabric: graph-level recall/write + ledger evidence — ✅ DONE (commit `b62d57d`)
-- **Task 4** — graph persistence and resume (durable node attempts) — ⏳ **NEXT**
-- **Task 5** — learning on graph runs (reflector consumes node observations)
-- **Task 6** — live Supermemory adapter behind `MemoryAdapter`
-- **Task 7** — AO specialist execution (wire `SpecialistNode` to AO)
+- **Task 4** — graph persistence and resume (durable node attempts) — ✅ DONE (commit `e78e754`)
+- **Task 5** — learning on graph runs (reflector consumes node observations) — ✅ DONE (commit `bc965e5`)
+- **Task 6** — live Supermemory adapter behind `MemoryAdapter` — ✅ DONE (commit `130d086`)
+- **Task 7** — AO specialist execution (wire `SpecialistNode` to AO) — ✅ DONE (commit `28544b8`)
 
-> **If you are continuing the build:** start at Task 4. Tasks 1–3 are merged
-> and their tests must keep passing. The "If it fails" and pitfall notes in
-> the completed tasks are **hard-won bug regressions** — do not undo them.
+> **All seven tasks are merged; full suite 193 passed.** The plan below is kept
+> as the executed design record. Before starting new work, read §9 "Next work
+> (not in this plan)" — it lists what is genuinely still open.
 
 ---
 
@@ -494,7 +494,14 @@ re-add the family filter to recall; write observations without goal text.
 
 ---
 
-### Task 4 — Graph persistence and resume
+### Task 4 — Graph persistence and resume — ✅ DONE
+
+> **Status:** implemented (commit `e78e754`), tests in
+> `tests/test_scheduler_resume.py`. Verified with a two-process scenario: a
+> crash mid-build left s1/s3 passed; a fresh scheduler + fresh ledger resumed,
+> re-ran only s2, and finished passed.
+> **Known limitation:** resume covers work nodes; planner re-expansion is not
+> checkpointed yet (a resumed run re-expands planners).
 
 **Objective:** a crashed scheduler run can be resumed without duplicating nodes.
 
@@ -524,7 +531,13 @@ both runs.
 
 ---
 
-### Task 5 — Learning on graph runs
+### Task 5 — Learning on graph runs — ✅ DONE
+
+> **Status:** implemented (commit `bc965e5`), tests in
+> `tests/test_scheduler_learning.py`. Verified adversarially: a hook returning
+> "passed" cannot change any node status or the graph verdict. Sibling fix:
+> `FleetController` hook exceptions previously left the run non-terminal; now
+> recorded as `reflection_error` with the run always closing.
 
 **Objective:** a failed graph run produces a candidate observation that feeds
 the existing learning gate. No new gate logic.
@@ -554,7 +567,13 @@ test suite will not catch it — but it is still wrong. Do not do it.
 
 ---
 
-### Task 6 — Live Supermemory adapter
+### Task 6 — Live Supermemory adapter — ✅ DONE
+
+> **Status:** implemented (commit `130d086`), tests in
+> `tests/test_supermemory_adapter.py`. Fail-loud verified against an
+> unreachable port with the real client. **Not yet connected to the live
+> service** — endpoint shapes are flagged for verification against the
+> Supermemory docs before a real deployment uses them.
 
 **Objective:** a real backend behind `MemoryAdapter`, with the local stub as
 the fallback when unconfigured.
@@ -587,7 +606,13 @@ fails loudly.
 
 ---
 
-### Task 7 — AO specialist execution
+### Task 7 — AO specialist execution — ✅ DONE
+
+> **Status:** implemented (commit `28544b8`), tests in
+> `tests/test_scheduler_ao.py`. `TaskSpec.tools` now carries node tool
+> declarations through the bridge; the inherited verification rule is guarded
+> at the scheduler level. **Live AO remains blocked** — the daemon was not
+> running during this build and the OpenCode worker no-op blocker is unchanged.
 
 **Objective:** a specialist node can run through AO (the existing
 `AORunner` boundary) instead of the test runner.
@@ -664,4 +689,36 @@ All four must pass. If any fails, stop and fix before committing.
 
 These are deliberately out of scope. Building them now is a failure mode,
 not progress.
+
+---
+
+## 9. Next work (not in this plan)
+
+All seven planned tasks are merged (full suite **193 passed**). What is
+genuinely still open, in priority order:
+
+1. **Live AO worker completion (blocker).** The AO daemon was not running at
+   the end of this build, and the earlier live OpenCode worker produced no
+   artifact (no_op). Until a real worker produces a fresh, independently
+   verified artifact, no autonomous-completion claim is allowed. Investigate
+   worker-side (prompt shape, ACP session, model/tool availability) — not more
+   controller logic.
+2. **Planner checkpointing.** `resume=True` covers work nodes only; a resumed
+   graph re-expands its planners. Store the expanded subgraph spec so resume
+   can skip re-expansion.
+3. **Real judge implementations.** Judge nodes accept any callable returning a
+   decision. The deterministic judge used in tests is a stub; an LLM judge
+   (evidence sufficiency, tool choice, plan quality) is the next layer — and it
+   must stay constrained by the same `continue/retry/reroute/escalate/stop`
+   vocabulary plus deterministic policy around it.
+4. **Verify the Supermemory adapter against the live service.** Endpoint
+   shapes follow the documented pattern but have only been exercised against a
+   fake client. Wire `build_memory_adapter()` into the CLI/scheduler entry
+   points and read back a real write/recall.
+5. **Wire the scheduler into the CLI.** `forge graph` compiles a graph, but
+   nothing runs it end-to-end from the CLI yet. Add `forge run-graph
+   <goal.json>` that builds a scheduler with the selected memory backend.
+6. **Second harness** (Codex or Claude Code) installed + smoke-tested, then a
+   transfer run: same goal, fresh harness, validated playbook recalled from the
+   fabric. This is the cross-harness proof point and it is still unproven.
 

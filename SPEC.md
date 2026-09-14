@@ -569,3 +569,20 @@ unattended production deployment.
   behavior when `memory=None`. Added `forge graph <goal.json>`. 150 tests
   pass (28 new). Recursive scheduler, judge routing, and the live Supermemory
   adapter remain open and are specified in `docs/BUILD.md`.
+- **0.2.1** (2026-09-14): built the execution layer from `docs/BUILD.md`.
+  Added `src/forge/scheduler.py` — `GraphScheduler` with planner subgraph
+  expansion bounded by `max_depth`, judge-as-routing with a bounded retry
+  budget, graph-level memory recall/write, durable per-node checkpoints with
+  crash-safe `resume=True`, and a learning hook with a hard candidate-only
+  boundary. Added `src/forge/supermemory_adapter.py` — the Supermemory backend
+  behind `MemoryAdapter` with fail-loud contracts (missing key → ValueError,
+  transport failure → `MemoryTransportError`) and `build_memory_adapter()` as
+  the explicit backend selector. The ledger gained a `graph_nodes` table with
+  compare-and-set transitions; `TaskSpec` gained a bounded `tools` field.
+  Two memory bugs were found by controlled end-to-end verification and fixed
+  at the root: recall was filtered by instance id (defeating cross-run
+  context) and observation descriptions lacked goal text (unmatchable by later
+  queries). Sibling fix: a raising learning hook no longer leaves a
+  `FleetController` run non-terminal. 193 tests pass (43 new since 0.2.0);
+  live AO completion and cross-harness transfer remain unproven and are still
+  stated as blockers.

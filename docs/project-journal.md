@@ -551,3 +551,77 @@ specified as Tasks 1–7 in `docs/BUILD.md`. No live AO completion is claimed.
   the unconfigured Supermemory backend are stated as open.
 
 ---
+
+## 2026-09-14 — Execution layer built (0.2.1): scheduler, judge routing, memory, resume
+
+- **Type:** milestone / build
+- **Status:** observed (193 tests; no live worker run claimed — AO daemon was down)
+- **Agents/harnesses:** Forge core, pytest (local)
+- **Scope:** `src/forge/scheduler.py`, `src/forge/supermemory_adapter.py`,
+  `src/forge/ledger.py` (graph_nodes), `src/forge/schema.py` (TaskSpec.tools),
+  `src/forge/graph.py`, `src/forge/fleet.py`, six new test files
+
+### What was built
+
+All seven tasks from `docs/BUILD.md`:
+
+1. **Recursive scheduler** — planner nodes expand into subgraphs, bounded by
+   `max_depth`; work nodes still execute through `FleetController` so the
+   verification authority is unchanged.
+2. **Judge-as-routing** — a judge node evaluates its dependency and returns
+   `continue / retry / reroute / escalate / stop`; retry re-runs the judged
+   node within a bounded budget; escalate/stop block it with the reason
+   preserved. Verified end-to-end: a first-attempt failure was recovered into
+   a passing graph purely through the judge's retry decision.
+3. **Memory fabric at graph level** — planner recall, judge decision
+   observations, graph-level outcomes, and `memory_recall`/`memory_write`
+   ledger events; one-arg planners unchanged, two-arg planners receive the
+   rendered recall block.
+4. **Durable checkpoints + resume** — `graph_nodes` table with compare-and-set
+   transitions; `resume=True` reuses nodes checkpointed as passed. Verified
+   across a fresh process: a crash mid-build re-ran only the unfinished node.
+5. **Learning hook** — runs only on failed graphs, after the graph closes;
+   candidates only, never able to change a verdict (verified adversarially).
+6. **Supermemory adapter** — protocol-conformant backend with fail-loud
+   contracts; backend chosen explicitly via `build_memory_adapter()`.
+7. **AO tool declarations** — `TaskSpec.tools` carries node declarations
+   through the bridge; the unverified-worker rule is guarded at scheduler level.
+
+### Two bugs found by controlled verification (fixed at the root)
+
+- **Cross-run recall was impossible.** Recall filtered by an instance id used
+  as a "task family" (`node_id` / `task_id`), so a run could only ever recall
+  its own past attempts. Fixed at both call sites; regression tests added.
+- **Observations were unmatchable.** Descriptions lacked the goal text
+  (`task <id> passed: completed`), so later semantic queries could never find
+  them. All write sites now carry the goal/rationale, bounded to 160 chars.
+
+Sibling fix: a raising learning hook left `FleetController` runs stuck in
+`running`; exceptions are now recorded as `reflection_error` and the run always
+reaches a terminal state.
+
+### Evidence
+
+```text
+uv run pytest -q → 193 passed (150 at 0.2.0; +43)
+Commits: 028cdc7, cff30e6, b62d57d, e78e754, bc965e5, 130d086, 28544b8
+Controlled checks: cross-run recall, judge-retry recovery, two-process resume,
+adversarial learning hook, unreachable-backend fail-loud
+```
+
+### Interpretation
+
+The graph engine the plan described now exists and is tested: typed nodes,
+recursive expansion, judge routing, a memory fabric that carries context
+across runs, durable resume, and a bounded learning hook. Everything is
+deterministic — no LLM judge, no live memory service, no live AO worker.
+
+### Impact / what stays open
+
+- Live AO completion is **still blocked** (daemon was down; the OpenCode no-op
+  worker was never resolved). No autonomous-completion claim is made.
+- The Supermemory adapter is exercised against a fake client only.
+- Cross-harness transfer remains unproven.
+- Next work is listed in `docs/BUILD.md` §9.
+
+---

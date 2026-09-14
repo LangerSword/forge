@@ -105,6 +105,8 @@ below the nodes.
 |---|---|---|
 | `src/forge/graph.py` | Typed graph: `NodeSpec`, `GraphSpec`, edge types, `compile_goal_graph`, `to_taskgraph` | implemented |
 | `src/forge/memory.py` | Context fabric: `Observation`, `MemoryAdapter`, `LocalMemoryStub`, `render_recall` | implemented (local stub) |
+| `src/forge/scheduler.py` | `GraphScheduler`: planner subgraph expansion, judge routing, node checkpoints + resume, memory recall/write, learning hook | implemented |
+| `src/forge/supermemory_adapter.py` | Supermemory backend behind `MemoryAdapter`; fail-loud; `build_memory_adapter()` selector | implemented (fake-client tested; live service not yet connected) |
 | `src/forge/fleet.py` | Scheduler/executor: dependencies, parallelism, deadlines, resume, memory wiring | implemented |
 | `src/forge/experiment.py` | Baseline → reflect → gate → learned comparison | implemented |
 | `src/forge/tooling.py` | Allowlisted tool registry with ledger-backed evidence | implemented |
@@ -112,7 +114,7 @@ below the nodes.
 | `src/forge/harness.py` | Bounded harness contracts + promotion gate | implemented |
 | Recursive scheduler (subgraph expansion) | Planner nodes returning subgraphs | implemented — `scheduler.py` |
 | Judge-as-routing nodes | `RoutingDecision` consumed by the scheduler | implemented — `scheduler.py` |
-| Live Supermemory adapter | Real backend behind `MemoryAdapter` | planned — see `docs/BUILD.md` Task 6 |
+| Live Supermemory adapter | Real backend behind `MemoryAdapter` | implemented behind a fake client; live service not yet connected |
 
 ### Evidence boundary (2026-09-07)
 
