@@ -110,9 +110,9 @@ below the nodes.
 | `src/forge/tooling.py` | Allowlisted tool registry with ledger-backed evidence | implemented |
 | `src/forge/playbook.py` | Validated playbook selection by task family | implemented |
 | `src/forge/harness.py` | Bounded harness contracts + promotion gate | implemented |
-| Recursive scheduler (subgraph expansion) | Planner nodes returning subgraphs | planned — see `docs/BUILD.md` |
-| Judge-as-routing nodes | `RoutingDecision` consumed by the scheduler | planned — see `docs/BUILD.md` |
-| Live Supermemory adapter | Real backend behind `MemoryAdapter` | planned — see `docs/BUILD.md` |
+| Recursive scheduler (subgraph expansion) | Planner nodes returning subgraphs | implemented — `scheduler.py` |
+| Judge-as-routing nodes | `RoutingDecision` consumed by the scheduler | implemented — `scheduler.py` |
+| Live Supermemory adapter | Real backend behind `MemoryAdapter` | planned — see `docs/BUILD.md` Task 6 |
 
 ### Evidence boundary (2026-09-07)
 

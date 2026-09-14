@@ -105,17 +105,25 @@ tests/test_playbook.py     (2 tests)
 Do them in order. Each task is self-contained: files, steps, expected output,
 done-when, and what to do when it fails.
 
-- **Task 1** — recursive scheduler (planner nodes expand into subgraphs)
-- **Task 2** — judge-as-routing (a `RoutingDecision` changes what runs next)
-- **Task 3** — memory fabric: graph-level recall/write + ledger evidence
-- **Task 4** — graph persistence and resume (durable node attempts)
+- **Task 1** — recursive scheduler (planner nodes expand into subgraphs) — ✅ DONE (commit `028cdc7`)
+- **Task 2** — judge-as-routing (a `RoutingDecision` changes what runs next) — ✅ DONE (commit `cff30e6`)
+- **Task 3** — memory fabric: graph-level recall/write + ledger evidence — ✅ DONE (commit `b62d57d`)
+- **Task 4** — graph persistence and resume (durable node attempts) — ⏳ **NEXT**
 - **Task 5** — learning on graph runs (reflector consumes node observations)
 - **Task 6** — live Supermemory adapter behind `MemoryAdapter`
 - **Task 7** — AO specialist execution (wire `SpecialistNode` to AO)
 
+> **If you are continuing the build:** start at Task 4. Tasks 1–3 are merged
+> and their tests must keep passing. The "If it fails" and pitfall notes in
+> the completed tasks are **hard-won bug regressions** — do not undo them.
+
 ---
 
-### Task 1 — Recursive scheduler (planner nodes expand into subgraphs)
+### Task 1 — Recursive scheduler (planner nodes expand into subgraphs) — ✅ DONE
+
+> **Status:** implemented in `src/forge/scheduler.py`, tests in
+> `tests/test_scheduler.py` (commit `028cdc7`). Kept below as the design
+> record; the code already exists, so only the pitfalls matter if you touch it.
 
 **Objective:** a planner node executes, returns a `GraphSpec`, and the
 scheduler runs that subgraph recursively, bounded by `max_depth`.
@@ -298,7 +306,10 @@ GIT_AUTHOR_DATE="2026-09-13T12:00:00+05:30" GIT_COMMITTER_DATE="2026-09-13T12:00
 
 ---
 
-### Task 2 — Judge-as-routing (RoutingDecision changes what runs next)
+### Task 2 — Judge-as-routing (RoutingDecision changes what runs next) — ✅ DONE
+
+> **Status:** implemented in `src/forge/scheduler.py`, tests in
+> `tests/test_routing.py` (commit `cff30e6`). Kept below as the design record.
 
 **Objective:** a judge node evaluates another node's result and returns a
 `RoutingDecision`; the scheduler honors `retry` by re-running the node once,
@@ -433,36 +444,53 @@ Expected: `6 passed`.
 
 ---
 
-### Task 3 — Memory fabric at the graph level
+### Task 3 — Memory fabric at the graph level — ✅ DONE
 
-**Objective:** every scheduler node recalls before executing and writes an
-observation after, exactly like `FleetController` already does per task.
+> **Status:** implemented in `src/forge/scheduler.py` (commit `b62d57d`);
+> tests in `tests/test_scheduler_memory.py`. Read this section as the
+> **corrected design record** — the two pitfalls below were real bugs found
+> by controlled end-to-end verification, and reintroducing either is a
+> regression.
 
-**Files:**
-- Modify: `src/forge/scheduler.py`
-- Create: `tests/test_scheduler_memory.py`
+**Final design (what is implemented):**
 
-**Steps (same TDD cycle as Task 1):**
+1. Before expanding a planner node, the scheduler recalls from the fabric:
+   `recalled = memory.recall(query=node.goal, limit=5)` and records a
+   `memory_recall` ledger event. **No family filter is passed** (see Pitfall 1).
+2. The rendered recall block is injected into the planner callable. A planner
+   that declares a second parameter receives it
+   (`def planner(node, memory_context) -> GraphSpec`); a one-argument planner
+   keeps working unchanged (detected with `inspect.signature`, never a
+   try/except on TypeError).
+3. After the planner's subgraph completes, an `outcome` observation is written
+   for the planner node, and a `memory_write` ledger event is recorded.
+4. Judge nodes write a `decision` observation (family = judged node) after
+   routing; each graph level writes a graph-level `outcome` observation.
+5. Work nodes keep using `FleetController`'s task-level recall/write — the
+   scheduler does not duplicate it.
 
-1. Write tests that:
-   - pass a `LocalMemoryStub` as `memory=` to `GraphScheduler`;
-   - pre-seed one `Observation(task_family="s1", ...)`;
-   - assert the executed node's status is passed and the stub gained an
-     `outcome` observation after the run (`stub.profile(tag="s1")["kinds"]["outcome"] == 1`).
-2. Run → fails because `memory=` is not accepted.
-3. Implement: in the scheduler, do exactly what `FleetController` does:
-   - before dispatch: `recalled = memory.recall(query=node.goal, task_family=node.node_id, limit=5)`
-     and record a `memory_recall` ledger event;
-   - after the node's result: `memory.write(Observation(node_id=..., kind="outcome",
-     description=f"node {node_id} {status}", task_family=node.node_id,
-     evidence_refs=(...,), activation="high"))` and record `memory_write`.
-4. Run the new tests → pass. Run `uv run pytest -q` → count only increases.
-5. Commit: `feat: wire memory fabric into graph scheduler`.
+**Pitfall 1 — never filter recall by an instance id.** The first
+implementation passed `task_family=node.node_id` (and `task_id` in the fleet)
+as if an instance id were a task family. A run could then only ever recall its
+own past attempts and **never context written by other nodes or earlier runs**
+— the exact opposite of the fabric's purpose. Recall at injection time is
+semantic across the whole fabric; the `task_family` filter remains available
+for targeted lookups only. Regression tests:
+`test_scheduler_recall_crosses_run_boundaries`,
+`test_controller_recall_crosses_family_boundaries`.
 
-**Done when:** new tests pass, full suite green, commit exists.
+**Pitfall 2 — observations must carry the goal text.** The first observation
+descriptions were `task <id> passed: <reason>` and `graph <id> passed: N nodes`
+— semantically empty, so no later query could match them. Every write site now
+includes the goal (or graph rationale), bounded to 160 chars. Regression tests:
+`test_scheduler_graph_observation_recalls_by_goal`,
+`test_controller_outcome_observation_recalls_by_goal`.
 
-**Do not:** invent a second memory API. `MemoryAdapter` in `memory.py` is the
-only interface; `LocalMemoryStub` is the only implementation.
+**DONE when:** ✅ 5 new tests pass; full suite 168 passed at commit
+`b62d57d`.
+
+**Do not:** invent a second memory API (`MemoryAdapter` is the only interface);
+re-add the family filter to recall; write observations without goal text.
 
 ---
 
@@ -608,6 +636,9 @@ All four must pass. If any fails, stop and fix before committing.
 | `ValidationError` on `NodeSpec` | `node_type` or `edge_type` not in the allowed list | use values from `graph.py` only |
 | Ledger test sees old events | reused a `run_id` | every test uses a unique run id |
 | `to_taskgraph` raises `max_depth` | passing a multi-level graph to the single-level executor | only pass single-level graphs |
+| Planner recalls nothing across runs | recall filtered by an instance id used as a "task family" | never pass `task_family=node.node_id` / `task_id` to recall at injection time — recall is semantic across the fabric |
+| Recall returns hits but the text can't match later goals | observation description lacks the goal text | every write site must carry the goal/rationale, bounded to 160 chars |
+| Judge never fires | judge node has no `deps`, or the judge callable wasn't passed | give the judge node `deps=[<judged node>]` and pass `judge=` |
 
 ## 7. Glossary (exact meanings used in this repo)
 
