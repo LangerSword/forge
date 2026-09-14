@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 from .ao_cli import AOCLI, AOCommandResult, parse_spawn_output
+from .harness_policy import policy_hash
 from .ledger import Ledger
 from .watchdog import (
     SessionSnapshot,
@@ -360,10 +361,25 @@ class AORunner:
                 {"session_id": session_id, "error_type": type(exc).__name__, "reason": reason},
             )
 
-    def run(self, request: AORunRequest) -> AORunResult:
+    def run(self, request: AORunRequest, *, policy: Any | None = None) -> AORunResult:
         events: list[AORunEvent] = []
         if self.ledger is not None:
             self.ledger.run(request.run_id, request.goal, request.condition, request.harness, "running")
+
+        # Harness policy is validated BEFORE any spawn touches the daemon:
+        # a violating request fails loud here, never as a downgraded run.
+        if policy is not None:
+            policy.validate_request(request)
+            if self.ledger is not None:
+                self.ledger.event(
+                    request.run_id, "policy_check", "ao-runner",
+                    {
+                        "policy_hash": policy_hash(policy),
+                        "harness": request.harness,
+                        "model": request.model,
+                        "mode": request.mode,
+                    },
+                )
 
         if request.existing_session_id:
             session_id = request.existing_session_id
@@ -382,6 +398,7 @@ class AORunner:
                     prompt=request.prompt,
                     harness=request.harness,
                     mode=request.mode,
+                    model=request.model,
                 )
                 self._record(events, request, "spawn", {"command": _safe_command(command), "decision": "execute"})
                 spawned = self.ao_cli.spawn(
@@ -390,6 +407,7 @@ class AORunner:
                     prompt=request.prompt,
                     harness=request.harness,
                     mode=request.mode,
+                    model=request.model,
                 )
                 parsed = parse_spawn_output(spawned)
                 self._record(

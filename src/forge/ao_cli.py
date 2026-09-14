@@ -177,22 +177,25 @@ class AOCLI:
             block = []
         return None
 
-    def spawn_command(self, *, project: str, name: str, prompt: str, harness: str = "opencode", mode: str = "chat") -> tuple[str, ...]:
+    def spawn_command(self, *, project: str, name: str, prompt: str, harness: str = "opencode", mode: str = "chat", model: str | None = None) -> tuple[str, ...]:
         if len(name) > 20:
             raise ValueError("AO worker name must be <=20 characters")
-        return (
+        command = (
             self.resolve_binary(), "spawn", "--project", project, "--kind", "worker",
             "--harness", harness, "--mode", mode, "--name", name, "--prompt", prompt,
         )
+        if model:
+            command = (*command, "--model", model)
+        return command
 
     @neatlogs.span(kind="TOOL")
-    def spawn(self, *, project: str, name: str, prompt: str, harness: str = "opencode", mode: str = "chat") -> AOCommandResult:
+    def spawn(self, *, project: str, name: str, prompt: str, harness: str = "opencode", mode: str = "chat", model: str | None = None) -> AOCommandResult:
         """Execute the documented CLI spawn command.
 
         This is intentionally separate from ``spawn_command`` so callers can
         record the exact command before deciding whether to execute it.
         """
-        command = self.spawn_command(project=project, name=name, prompt=prompt, harness=harness, mode=mode)
+        command = self.spawn_command(project=project, name=name, prompt=prompt, harness=harness, mode=mode, model=model)
         # Spawn is side-effecting: preserve nonzero output so the runner can
         # reconcile a session created before the CLI reported an error.
         proc = subprocess.run(command, cwd=self.cwd, capture_output=True, text=True, timeout=30)

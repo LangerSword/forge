@@ -4,21 +4,25 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from forge.ao_cli import AOCommandResult, parse_spawn_output
 from forge.ao_runner import AORunRequest, AORunner, session_snapshot
+from forge.harness_policy import policy_hash
+from forge.ledger import Ledger
 from forge.watchdog import WorkerClassification
 
 
 class FakeCLI:
     def __init__(self, worktree: Path):
         self.worktree = worktree
-        self.spawn_calls: list[dict[str, str]] = []
+        self.spawn_calls: list[dict[str, str | None]] = []
 
-    def spawn_command(self, *, project: str, name: str, prompt: str, harness: str, mode: str):
+    def spawn_command(self, *, project: str, name: str, prompt: str, harness: str, mode: str, model: str | None = None):
         return ("ao", "spawn", "--project", project, "--name", name, "--prompt", "<redacted>")
 
-    def spawn(self, *, project: str, name: str, prompt: str, harness: str, mode: str):
-        self.spawn_calls.append({"project": project, "name": name, "prompt": prompt, "harness": harness, "mode": mode})
+    def spawn(self, *, project: str, name: str, prompt: str, harness: str, mode: str, model: str | None = None):
+        self.spawn_calls.append({"project": project, "name": name, "prompt": prompt, "harness": harness, "mode": mode, "model": model})
         return AOCommandResult(
             ("ao", "spawn"),
             0,
@@ -28,8 +32,8 @@ class FakeCLI:
 
 
 class NonzeroSpawnCLI(FakeCLI):
-    def spawn(self, *, project: str, name: str, prompt: str, harness: str, mode: str):
-        self.spawn_calls.append({"project": project, "name": name, "prompt": prompt, "harness": harness, "mode": mode})
+    def spawn(self, *, project: str, name: str, prompt: str, harness: str, mode: str, model: str | None = None):
+        self.spawn_calls.append({"project": project, "name": name, "prompt": prompt, "harness": harness, "mode": mode, "model": model})
         return AOCommandResult(
             ("ao", "spawn"),
             1,
@@ -391,3 +395,82 @@ def test_runner_classifies_no_op_and_kills_after_bounded_nudge(tmp_path: Path):
     assert client.sent
     assert client.killed == ["session-1"]
     assert result.to_dict()["schema_version"] == "forge.ao-runner.v1"
+
+
+# --------------------------------------------------------------------------
+# HarnessPolicy wiring: validate before spawn, model knob, ledger policy hash
+# --------------------------------------------------------------------------
+
+
+def _policy_test_request(**overrides):
+    from forge.ao_runner import AORunRequest
+
+    defaults = {
+        "run_id": "policy-runner-test",
+        "goal": "policy wiring test",
+        "project": "forge",
+        "worker_name": "policy-w",
+        "prompt": "do the thing",
+        "harness": "opencode",
+        "mode": "chat",
+        "max_polls": 5,
+        "poll_interval_s": 0.0,
+        "max_runtime_s": 60.0,
+    }
+    defaults.update(overrides)
+    return AORunRequest(**defaults)
+
+
+def _policy():
+    from forge.harness_policy import HarnessPolicy
+
+    return HarnessPolicy(
+        harness="opencode",
+        allowed_models=("nvidia/", None),
+        max_polls=120,
+        max_runtime_s=900.0,
+    )
+
+
+def test_runner_rejects_nonallowlisted_model_before_spawn():
+    runner = AORunner(ao_cli=FakeCLI(Path("/tmp/wt")), ao_client=FakeClient([{}]))
+    with pytest.raises(Exception) as excinfo:
+        runner.run(_policy_test_request(model="sketchy-model"), policy=_policy())
+    assert "model" in str(excinfo.value)
+
+
+def test_runner_rejects_bounds_outside_policy_before_spawn():
+    runner = AORunner(ao_cli=FakeCLI(Path("/tmp/wt")), ao_client=FakeClient([{}]))
+    with pytest.raises(Exception, match="runtime"):
+        runner.run(_policy_test_request(max_runtime_s=9999.0), policy=_policy())
+
+
+def test_runner_passes_model_flag_to_spawn_command():
+    cli = FakeCLI(Path("/tmp/wt"))
+    client = FakeClient([{"id": "session-1", "status": "exited", "isTerminated": True}])
+    runner = AORunner(ao_cli=cli, ao_client=client)
+    result = runner.run(_policy_test_request(model="nvidia/abacusai/dracarys-llama-3.1-70b-instruct"))
+    assert result.status in {"passed", "blocked", "failed"}
+    assert cli.spawn_calls, "spawn never executed"
+    assert cli.spawn_calls[0]["model"] == "nvidia/abacusai/dracarys-llama-3.1-70b-instruct"
+
+
+def test_runner_records_policy_hash_in_ledger(tmp_path):
+    ledger = Ledger(tmp_path)
+    cli = FakeCLI(Path("/tmp/wt"))
+    client = FakeClient([{"id": "session-1", "status": "exited", "isTerminated": True}])
+    runner = AORunner(ao_cli=cli, ao_client=client, ledger=ledger)
+    policy = _policy()
+    runner.run(_policy_test_request(), policy=policy)
+    events = ledger.events_for_run("policy-runner-test")
+    hashes = [e["payload"].get("policy_hash") for e in events if e["kind"] == "policy_check"]
+    assert hashes and hashes[0] == policy_hash(policy)
+
+
+def test_runner_without_policy_still_runs():
+    """Back-compat: policy=None keeps the old behavior."""
+    cli = FakeCLI(Path("/tmp/wt"))
+    client = FakeClient([{"id": "session-1", "status": "exited", "isTerminated": True}])
+    runner = AORunner(ao_cli=cli, ao_client=client)
+    result = runner.run(_policy_test_request())
+    assert result.status in {"passed", "blocked", "failed"}
