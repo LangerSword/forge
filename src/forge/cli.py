@@ -20,6 +20,7 @@ neatlogs.init(api_key=os.getenv("NEATLOGS_API_KEY"), workflow_name="forge-cli")
 logging.getLogger("neatlogs").setLevel(logging.WARNING)
 
 from . import __version__
+from .accuracy import run_accuracy_sweep
 from .ao import AOClient
 from .ao_cli import AOCLI
 from .c0_run import run_c0
@@ -224,6 +225,36 @@ def cmd_graph(goal_file: str) -> int:
     return 0
 
 
+def cmd_accuracy(run_id: str) -> int:
+    """Run the deterministic judge/gate accuracy sweep and print per-dimension rates.
+
+    Exit code 0 only when every dimension scores 100%; failures carry detail.
+    """
+    ledger = Ledger(root())
+    result = run_accuracy_sweep(ledger, run_id=run_id)
+    summary = result["summary"]
+    failures = [grade for grade in result["grades"] if grade.failure is not None]
+    payload = {
+        "schema_version": "forge.accuracy.v1",
+        "ok": summary["all_dimensions_100"],
+        "run_id": run_id,
+        "summary": summary,
+        "failure_count": len(failures),
+        "failures": [
+            {
+                "offer_type": grade.scenario.offer_type,
+                "discount_percent": grade.scenario.discount_percent,
+                "add_on_price_inr": grade.scenario.add_on_price_inr,
+                "cart_value_inr": grade.scenario.cart_value_inr,
+                "failure": grade.failure,
+            }
+            for grade in failures[:20]
+        ],
+    }
+    print(json.dumps(payload, indent=2))
+    return 0 if summary["all_dimensions_100"] else 1
+
+
 def _default_task_executor():
     class SimpleExecutor:
         name = "cli-executor"
@@ -264,6 +295,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("experiments", help="list completed experiments")
     graph_cmd = sub.add_parser("graph", help="compile a goal into its typed execution graph")
     graph_cmd.add_argument("goal_file", help="path to GoalSpec JSON file")
+    accuracy = sub.add_parser("accuracy", help="run the deterministic judge/gate accuracy sweep")
+    accuracy.add_argument("--run-id", default="accuracy-sweep")
     dash = sub.add_parser("dashboard")
     dash.add_argument("--port", type=int, default=8787)
     args = parser.parse_args(argv)
@@ -336,6 +369,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_experiments()
     if args.command == "graph":
         return cmd_graph(args.goal_file)
+    if args.command == "accuracy":
+        return cmd_accuracy(args.run_id)
     return 2
 
 
