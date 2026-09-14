@@ -1,6 +1,6 @@
 # Forge — Spec Sheet
 
-**Version:** 0.2.3 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-14
+**Version:** 0.2.4 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-15
 **Track:** Syndicate by Maximor — Track 1: Automated Agent Engineering
 **Deadline:** 2026-09-07 03:30 IST (Devpost)
 **Working dir:** `~/forge` · **Remote:** `https://github.com/LangerSword/forge`
@@ -612,3 +612,21 @@ unattended production deployment.
   not pollute the project ledger; a regressed gate is detected, not silently
   re-graded green. 205 tests pass (12 new). Live AO completion and
   cross-harness transfer remain unproven and are still stated as blockers.
+- **0.2.4** (2026-09-15): unified harness policy — variance pinned by
+  construction instead of cross-harness variance-by-measurement.
+  `src/forge/harness_policy.py` declares the contract (`HarnessPolicy`:
+  pinned opencode harness, explicit model allowlist with provider prefixes +
+  `None` default so model-variant A/B stays first-class, chat-only session
+  interface, poll/runtime bounds) and `validate_request` rejects anything
+  else loudly BEFORE any spawn touches the daemon; `policy_hash` pins
+  comparability (two runs are only comparable under the same hash, recorded
+  in the ledger as `policy_check`). `AORunRequest`/`AOCLI.spawn` gain the
+  documented `--model` per-session override. `forge review` gained a fourth
+  suite: `policy_suite` grades the contract AND its enforcement order
+  (violations must raise before spawn, observed via a recording CLI seam;
+  a late-validating runner is detected, not re-graded green). Declared
+  contract lives in `.forge/harness-policy.json`; live rejection smoke
+  verified against the real daemon (violating model rejected, zero sessions
+  created). Cross-harness transfer is retired as a measured claim: skills
+  are portable by design (harness-agnostic `ContextPackage`/skill format),
+  improvement is measured on the unified harness. 227 tests pass (8 new).

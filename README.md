@@ -46,9 +46,13 @@ claim is made.
   one-off verifier had a swallowed `TypeError`, caught and fixed before the
   clean pass. This proves one bounded autonomous completion, not a fleet or
   cross-harness claim — those remain open.
-- **Cross-harness transfer — target:** the portable context-package contract is
-  designed for a fresh worker on a different AO harness. Only OpenCode is
-  currently observed authorized in AO, so no transfer result is claimed.
+- **Cross-harness transfer — retired as a measured claim (0.2.4):** replaced
+  by the unified harness policy: variance is pinned by construction (declared
+  `HarnessPolicy`, enforced before spawn, `policy_hash` comparability in the
+  ledger) rather than measured on a second harness Forge does not run. The
+  skill format (`ContextPackage` + validated skills) remains harness-agnostic
+  by design, so a transfer run stays one spawn away if a second CLI is ever
+  installed.
 - **Hermes — reflection sidecar:** Hermes is external to AO. It reads bounded
   run evidence and may propose candidate skills or strategy notes; Forge, not
   Hermes, owns the promotion gate. Hermes is not presented as an AO worker.
@@ -67,8 +71,10 @@ claim is made.
   sweep), the controller verifier-authority truth table, and the judge-routing
   matrix — with per-case failure detail in the ledger. It exits nonzero unless
   every dimension is 100%, is re-runnable, and detects a deliberately regressed
-  gate rather than re-grading it green. This grades Forge's decision systems;
-  it is not an LLM judge and proves nothing about live AO completion.
+  gate rather than re-grading it green. A fourth suite grades the harness
+  policy contract and its enforcement order (violations must raise before
+  spawn). This grades Forge's decision systems; it is not an LLM judge and
+  proves nothing about live AO completion.
 
 The tracked C0 submission report records a failing baseline and a passing
 bounded repair, plus a `candidate` skill artifact; it explicitly does not claim
@@ -136,6 +142,10 @@ python -m forge.cli run evals/goals/<goal>.json --condition C0
 
 # 3. grade Forge's own verdict systems (deterministic oracles, no LLM judge)
 python -m forge.cli review
+
+# The unified harness policy (declared in .forge/harness-policy.json) is
+# enforced before every spawn: harness pinned to opencode, explicit model
+# allowlist, chat-only sessions, bounded polls/runtime.
 
 # 4. dashboard
 python -m forge.cli dashboard

@@ -752,3 +752,67 @@ AO session forge-14                       → exited, isTerminated true
 
 Cross-harness transfer (only opencode authorized), multi-worker fleet runs,
 live Supermemory backend. No claims beyond one bounded autonomous completion.
+
+## 2026-09-15 — Unified harness policy: variance pinned by construction (0.2.4)
+
+- **Type:** milestone / policy layer
+- **Status:** observed (227 tests; live rejection smoke vs real daemon)
+- **Agents/harnesses:** Forge core, pytest, AO daemon (rejection smoke)
+- **Scope:** `src/forge/harness_policy.py`, `tests/test_harness_policy.py`,
+  `ao_runner.py`/`ao_cli.py` wiring, `review.py` policy suite,
+  `.forge/harness-policy.json`
+
+### Decision
+
+Cross-harness transfer was replaced by a unified harness with explicit
+guardrails. Cross-harness kills A/B confounds by measurement (second
+environment); the policy kills them by construction (declared pins). For a
+single-operator project that will never run a second CLI, construction is
+the honest answer: every C0/C2 comparison becomes trustworthy because model,
+harness, mode, and bounds are identical by pinning, not by hope. The
+portability claim survives as a design property (harness-agnostic
+`ContextPackage`/skill format), not a measured one.
+
+### What was built
+
+- `HarnessPolicy` — pinned opencode harness; explicit model allowlist
+  (provider prefixes + `None` default so model-variant A/B stays first-class
+  INSIDE the policy); chat-only session interface; poll/runtime bounds.
+- `validate_request` — rejects violations loudly BEFORE any spawn touches
+  the daemon; `policy_hash` pins comparability, recorded in the ledger as
+  `policy_check` next to the actual spawn flags.
+- `AORunRequest.model` + `AOCLI.spawn(--model)` — the documented AO
+  per-session override, threaded through both spawn call sites.
+- `review.py` fourth suite — `policy_suite` grades the contract (11-case
+  boundary sweep against an oracle table) AND its enforcement order:
+  violations must raise before spawn, observed via a recording CLI seam
+  (`runner_factory(cli, client)`); a late-validating runner is DETECTED
+  (violating model reached spawn), regression-tested.
+- `.forge/harness-policy.json` — the declared contract, readable, hashed
+  (`6630d9005689faf5` at this revision).
+
+### Evidence
+
+```text
+uv run pytest -q → 227 passed (8 new: 12 policy + suite + wiring tests)
+live rejection smoke (real daemon): model 'totally-sketchy-model' rejected
+  with HarnessPolicyError BEFORE spawn; sessions before == after (zero
+  sessions created)
+policy file loads: harness opencode, models ('nvidia/', 'deepseek/',
+  'local-lmstudio/', None), hash 6630d9005689faf5
+```
+
+### Bugs found while building (root-caused, not stacked)
+
+- The `model` knob dead-ended in `AORunRequest` — `run()` never passed it to
+  `spawn_command`/`spawn`; both call sites now thread it.
+- First `policy_suite` design observed spawns only through an injected
+  runner object (unobservable for regressed implementations); redesigned to
+  `runner_factory(cli, client)` so spawn is always observable through the
+  suite's recording CLI.
+
+### What stays open
+
+Model-variant A/B through the policy (next experiment), live Supermemory
+backend, multi-worker fleet runs. Cross-harness transfer is retired as a
+measured claim, not an open blocker.
