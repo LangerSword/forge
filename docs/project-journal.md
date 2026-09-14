@@ -626,53 +626,14 @@ deterministic — no LLM judge, no live memory service, no live AO worker.
 
 ---
 
-## 2026-09-14 — Deterministic accuracy grading for the judge/gate path (0.2.2)
+## 2026-09-14 — Reverted: fabricated accuracy domain (0.2.2)
 
-- **Type:** milestone / evaluation harness
-- **Status:** observed (214 tests; deterministic sweep, no LLM judges)
-- **Agents/harnesses:** Forge core, pytest (local)
-- **Scope:** `src/forge/accuracy.py`, `tests/test_accuracy.py`, `forge accuracy` CLI
-
-### What was built
-
-`src/forge/accuracy.py` implements the agent-accuracy-grading methodology
-(Scenario Gen → Judge Reasoning (stub) → Grading Func → Summary Stats) for
-Forge's judge/gate decision path:
-
-- `gate_optimal_verdict` — deterministic ground truth computed from scenario
-  parameters (min discount 5%, cap 15%, max add-on share 25%).
-- `render_gate_prompt` / `stub_judge_from_prompt` — the stub reads ONLY the
-  `Gate decision:` data line; instruction text containing gate vocabulary is
-  provably ignored (regression-tested); verdict aliases accept
-  ACCEPT/APPROVE, DECLINE/REJECT; a missing data line fails closed.
-- `grade_case` — five dimensions: `verdict_correct`, `gate_aware`,
-  `limits_accurate`, `routing_appropriate`, `prompt_math_consistent`.
-- `run_accuracy_sweep` — 60 cases covering the decision boundaries exactly
-  (discounts 3/5/8/15/16%, shares 10/25/30%, carts 100/400, both offer
-  types), persisted per case + per-dimension summary to the ledger with
-  failure detail. `forge accuracy` exits nonzero unless every dimension is 100%.
-
-### Guarded silent bugs (from the skill's pitfall list)
-
-- Prompt math: the rendered share is re-derived as `add_on / cart` — the wrong
-  formula `add_on / (cart - add_on)` is detected as a scored mismatch.
-- Stub scoping: regex targets the `Gate decision:` line only; "capped" /
-  "rejected" in instruction text cannot drive the stub.
-
-### Evidence
-
-```text
-uv run pytest -q → 214 passed (+21 since 0.2.1)
-forge accuracy → ok: true, all 5 dimensions 1.0, 60/60, exit 0
-Noisy-judge demo → verdict 60%, failures clustered exactly at the cap
-boundary (at-cap + above-cap), per-case failure detail in the ledger
-```
-
-### Interpretation / what stays open
-
-The grader is the infrastructure §9 item 3 needs: when a real (LLM) judge
-lands, it plugs into `run_accuracy_sweep(judge_stub=...)` and its accuracy is
-measured against the same deterministic ground truth. Live AO and
-cross-harness transfer remain unproven.
+The `accuracy.py` module added earlier today applied the agent-accuracy-grading
+skill to an **invented commerce scenario domain** (minimum discounts, add-on
+shares, cart values) lifted from the skill's razorpay-project session
+reference. That domain is not Forge's; the module graded nothing Forge had
+built. Removed entirely (module, tests, CLI command, docs). The methodology
+remains applicable and is re-applied to Forge's own verdict-producing
+components instead. No history rewrite — a removal commit.
 
 ---

@@ -710,11 +710,7 @@ genuinely still open, in priority order:
    decision. The deterministic judge used in tests is a stub; an LLM judge
    (evidence sufficiency, tool choice, plan quality) is the next layer — and it
    must stay constrained by the same `continue/retry/reroute/escalate/stop`
-   vocabulary plus deterministic policy around it. **The grader is already
-   built:** `src/forge/accuracy.py` scores any judge callable against
-   deterministic gate ground truth (`run_accuracy_sweep(judge_stub=...)`),
-   with a boundary sweep, per-dimension rates, and failure detail persisted to
-   the ledger — see `forge accuracy`.
+   vocabulary plus deterministic policy around it.
 4. **Verify the Supermemory adapter against the live service.** Endpoint
    shapes follow the documented pattern but have only been exercised against a
    fake client. Wire `build_memory_adapter()` into the CLI/scheduler entry

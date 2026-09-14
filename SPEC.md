@@ -586,14 +586,9 @@ unattended production deployment.
   `FleetController` run non-terminal. 193 tests pass (43 new since 0.2.0);
   live AO completion and cross-harness transfer remain unproven and are still
   stated as blockers.
-- **0.2.2** (2026-09-14): added `src/forge/accuracy.py` — deterministic
-  grading for the judge/gate decision path (agent-accuracy-grading
-  methodology, no LLM judges). `gate_optimal_verdict` computes ground truth
-  from scenario parameters; the scenario-aware stub reads ONLY the
-  `Gate decision:` data line (instruction text never drives it); the grader
-  re-derives the rendered add-on share numerically `add_on / cart` so
-  prompt-construction bugs surface as a scored dimension. `forge accuracy`
-  runs a 60-case boundary sweep (below/at/above every threshold, both offer
-  types), persists every case + a per-dimension summary to the ledger with
-  failure detail, and exits nonzero unless every dimension is 100%. 214 tests
-  pass (21 new since 0.2.1).
+- **0.2.2** (2026-09-14, REVERTED): an `accuracy.py` module was briefly added
+  that applied the agent-accuracy-grading skill to an invented commerce
+  scenario domain (discounts, add-ons, cart shares) — that domain belongs to a
+  different project. It did not grade Forge's own artifacts. Removed in
+  `0.2.3`; the skill's methodology is instead applied to Forge's own decision
+  systems (see 0.2.3).
