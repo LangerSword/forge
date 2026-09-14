@@ -113,18 +113,27 @@ class AOCLI:
     cwd: Path | None = None
 
     def resolve_binary(self) -> str:
+        # Env override wins: AO_CLI_BINARY beats discovery.
+        env_binary = os.getenv("AO_CLI_BINARY")
+        if env_binary:
+            return env_binary
         if self.binary:
             return self.binary
+        # Discover the live daemon binary via /proc, NOT gated on any
+        # hardcoded AppImage path. Regression: this scan used to be nested
+        # inside `if candidate.exists()` for a ~/.local/bin AppImage, so a
+        # machine where AO lives elsewhere resolved nothing even with the
+        # daemon running (observed 2026-09-15).
+        for proc in Path("/proc").glob("[0-9]*"):
+            try:
+                target = Path(os.readlink(proc / "exe"))
+            except (OSError, ValueError):
+                continue
+            if target.name == "ao" and "resources/daemon" in str(target):
+                return str(target)
         candidate = Path("/home/lakshaya/.local/bin/agent-orchestrator-linux-x64.AppImage")
         if candidate.exists():
-            # AppImage is not the CLI itself; prefer the live daemon binary when available.
-            for proc in Path("/proc").glob("[0-9]*"):
-                try:
-                    target = Path(os.readlink(proc / "exe"))
-                except (OSError, ValueError):
-                    continue
-                if target.name == "ao" and "resources/daemon" in str(target):
-                    return str(target)
+            return str(candidate)
         raise AOCommandError("AO CLI binary not resolved; run AO or set AO_CLI_BINARY")
 
     def run(self, args: tuple[str, ...], *, timeout: int = 30) -> AOCommandResult:

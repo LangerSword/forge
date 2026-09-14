@@ -83,3 +83,58 @@ def test_spawn_preserves_nonzero_result_for_side_effect_reconciliation(monkeypat
     result = cli.spawn(project="forge", name="reconcile", prompt="create artifact")
     assert result.exit_code == 1
     assert "forge-9" in result.stdout
+
+
+def test_resolve_binary_finds_live_daemon_even_without_appimage(monkeypatch):
+    """The /proc scan must not be gated on a hardcoded AppImage path.
+
+    Regression: the scan was nested inside `if candidate.exists()` for
+    ~/.local/bin/agent-orchestrator-linux-x64.AppImage, so a machine where AO
+    lives elsewhere (~/Applications, hash-suffixed) resolved nothing even with
+    the daemon running.
+    """
+    import os
+    from pathlib import Path
+
+    cli = AOCLI()
+
+    class FakeProc:
+        def __init__(self, pid: int, exe: str):
+            self._dir = Path(f"/proc-self-test-{pid}")
+            self._dir.mkdir(exist_ok=True)
+            (self._dir / "exe").symlink_to(exe)
+
+    # point the glob at a fixture dir instead of /proc
+    import forge.ao_cli as ao_cli_mod
+
+    monkeypatch.setattr(ao_cli_mod.Path, "glob", lambda self, pattern: iter([]))
+
+    # Simulate the live daemon found via /proc: monkeypatch os.readlink over a
+    # synthetic entry by globbing a real fixture directory instead.
+    fixture = Path("/proc")
+
+    def fake_glob(self, pattern):
+        # return one synthetic pid dir whose exe reads as the daemon binary
+        return iter([Path("/proc/self")])
+
+    monkeypatch.setattr(Path, "glob", fake_glob)
+
+    def fake_readlink(path):
+        if path.name == "exe" and str(path).startswith("/proc/self"):
+            return "/tmp/.mount_agent-XXXX/resources/daemon/ao"
+        raise OSError("nope")
+
+    monkeypatch.setattr(ao_cli_mod.os, "readlink", fake_readlink)
+
+    resolved = cli.resolve_binary()
+    assert resolved == "/tmp/.mount_agent-XXXX/resources/daemon/ao"
+
+
+def test_resolve_binary_env_override_wins(monkeypatch):
+    """AO_CLI_BINARY must beat discovery — an explicit override is never
+    second-guessed by the /proc scan."""
+    import forge.ao_cli as ao_cli_mod
+
+    monkeypatch.setenv("AO_CLI_BINARY", "/opt/ao/bin/ao")
+    cli = AOCLI()
+    assert cli.resolve_binary() == "/opt/ao/bin/ao"
