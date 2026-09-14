@@ -2,13 +2,18 @@
 
 The scheduler is the commander's dispatch layer above `FleetController`:
 
-- Non-planner nodes (specialist/verifier/judge/...) execute through the
-  existing bounded `FleetController` — verification authority is unchanged.
+- Non-planner nodes (specialist/verifier/...) execute through the existing
+  bounded `FleetController` — verification authority is unchanged.
 - Planner nodes expand: the injected `planner` callable receives the node and
   returns a `GraphSpec`, which is executed recursively, bounded by `max_depth`.
+- Judge nodes route: the injected `judge` callable evaluates the judged node's
+  result and returns a decision (continue / retry / reroute / escalate / stop).
+  `retry` re-runs the judged node within a bounded budget; `escalate`/`stop`
+  mark the judged node blocked with the judge's reason preserved.
 
 Determinism rules:
-- Ledger events record graph_started / planner_expanded / graph_completed.
+- Ledger events record graph_started / planner_expanded / routing_decision /
+  graph_completed per level.
 - Runner exceptions are never swallowed: they surface to the caller.
 - A graph passes only when every node result passes.
 """
@@ -24,10 +29,11 @@ from .ledger import Ledger
 from .schema import GoalSpec
 
 _TERMINAL_STATUSES = ("passed", "failed", "blocked", "stopped")
+_DECISIONS = ("continue", "retry", "reroute", "escalate", "stop")
 
 
 class GraphScheduler:
-    """Execute a GraphSpec with planner-node subgraph expansion."""
+    """Execute a GraphSpec with planner subgraph expansion and judge routing."""
 
     def __init__(
         self,
@@ -35,16 +41,20 @@ class GraphScheduler:
         *,
         runner_factory: Callable[[Any], Any],
         planner: Callable[[NodeSpec], GraphSpec] | None = None,
+        judge: Callable[[NodeSpec, NodeResult], Any] | None = None,
         memory: Any | None = None,
         clock: Callable[[], float] = monotonic,
         max_depth: int = 3,
+        max_retries: int = 1,
     ) -> None:
         self.root = root
         self.runner_factory = runner_factory
         self.planner = planner
+        self.judge = judge
         self.memory = memory
         self.clock = clock
         self.max_depth = max_depth
+        self.max_retries = max_retries
         self.ledger = Ledger(root)
 
     def run(
@@ -65,7 +75,13 @@ class GraphScheduler:
         })
 
         planner_nodes = [node for node in graph.nodes if node.node_type == "planner"]
-        work_nodes = [node for node in graph.nodes if node.node_type != "planner"]
+        judge_nodes = [node for node in graph.nodes if node.node_type == "judge"]
+        if self.judge is None:
+            work_nodes = [node for node in graph.nodes if node.node_type != "planner"]
+        else:
+            work_nodes = [
+                node for node in graph.nodes if node.node_type not in ("planner", "judge")
+            ]
 
         if planner_nodes and self.planner is None:
             raise ValueError("planner nodes require a planner callable")
@@ -78,7 +94,8 @@ class GraphScheduler:
                     f"planner node '{node.node_id}' cannot depend on work nodes in this version"
                 )
 
-        results: list[NodeResult] = []
+        results_by_id: dict[str, NodeResult] = {}
+        effective_goal = goal or self._synthetic_goal(graph)
 
         for node in planner_nodes:
             subgraph = self.planner(node) if self.planner is not None else None
@@ -95,59 +112,34 @@ class GraphScheduler:
                 goal=goal,
                 depth=depth + 1,
             )
-            results.append(
-                NodeResult(
-                    node_id=node.node_id,
-                    status=sub_result.status,
-                    observations=(),
-                    evidence_refs=(f"graph:{graph_id}:{node.node_id}",),
-                    subgraph=sub_result,
-                )
+            results_by_id[node.node_id] = NodeResult(
+                node_id=node.node_id,
+                status=sub_result.status,
+                observations=(),
+                evidence_refs=(f"graph:{graph_id}:{node.node_id}",),
+                subgraph=sub_result,
             )
 
         if work_nodes:
-            # Dependencies on planner nodes are already satisfied: the planner's
-            # subgraph ran to completion above. Strip those deps so the bounded
-            # executor (which only knows this level) validates cleanly.
-            adjusted: list[NodeSpec] = []
-            for node in work_nodes:
-                if any(dep in planner_ids for dep in node.deps):
-                    node = node.model_copy(
-                        update={"deps": [dep for dep in node.deps if dep not in planner_ids]}
-                    )
-                adjusted.append(node)
+            dispatch = self._strip_satisfied_deps(work_nodes, planner_ids)
+            results_by_id.update(
+                self._run_work(dispatch, effective_goal, f"{graph_id}:work", graph.max_parallel)
+            )
 
-            work_spec = GraphSpec(
-                nodes=adjusted,
-                max_parallel=graph.max_parallel,
-                max_depth=1,
-                rationale=graph.rationale,
+        if judge_nodes and self.judge is not None:
+            self._apply_routing(
+                graph_id=graph_id,
+                judge_nodes=judge_nodes,
+                results_by_id=results_by_id,
+                effective_goal=effective_goal,
+                nodes_by_id={node.node_id: node for node in graph.nodes},
             )
-            controller = FleetController(
-                self.root,
-                runner_factory=self.runner_factory,
-                memory=self.memory,
-                clock=self.clock,
-            )
-            report = controller.run(
-                goal or self._synthetic_goal(graph),
-                to_taskgraph(work_spec),
-                run_id=f"{graph_id}:work",
-            )
-            for outcome in report.task_outcomes:
-                status = outcome.status if outcome.status in _TERMINAL_STATUSES else "failed"
-                observations: tuple[str, ...] = ()
-                if status != "passed" and outcome.reason:
-                    observations = (outcome.reason,)
-                results.append(
-                    NodeResult(
-                        node_id=outcome.task_id,
-                        status=status,
-                        observations=observations,
-                        evidence_refs=(f"run:{outcome.run_id}",),
-                    )
-                )
 
+        results = [
+            results_by_id[node.node_id]
+            for node in graph.nodes
+            if node.node_id in results_by_id
+        ]
         status = "passed" if results and all(r.status == "passed" for r in results) else "failed"
         self.ledger.event(graph_id, "graph_completed", "scheduler", {
             "status": status,
@@ -156,6 +148,119 @@ class GraphScheduler:
         })
         self.ledger.update_run_status(graph_id, status)
         return GraphRunResult(graph_id=graph_id, status=status, node_results=tuple(results))
+
+    def _apply_routing(
+        self,
+        *,
+        graph_id: str,
+        judge_nodes: list[NodeSpec],
+        results_by_id: dict[str, NodeResult],
+        effective_goal: GoalSpec,
+        nodes_by_id: dict[str, NodeSpec],
+    ) -> None:
+        retries_used: dict[str, int] = {}
+        for judge_node in judge_nodes:
+            judged_id = next(
+                (dep for dep in judge_node.deps if dep in results_by_id), None
+            )
+            if judged_id is None:
+                raise ValueError(
+                    f"judge node '{judge_node.node_id}' has no completed dependency to judge"
+                )
+            judged = results_by_id[judged_id]
+            raw = self.judge(judge_node, judged) if self.judge is not None else None
+            if isinstance(raw, dict):
+                decision = raw.get("decision")
+                reason = str(raw.get("reason", ""))
+            else:
+                decision = getattr(raw, "decision", None)
+                reason = str(getattr(raw, "reason", ""))
+            if decision not in _DECISIONS:
+                raise ValueError(f"invalid routing decision: {decision!r}")
+
+            self.ledger.event(graph_id, "routing_decision", "scheduler", {
+                "judge_node_id": judge_node.node_id,
+                "judged_node_id": judged_id,
+                "decision": decision,
+                "reason": reason,
+            })
+
+            if decision == "retry":
+                used = retries_used.get(judged_id, 0)
+                if used < self.max_retries:
+                    retries_used[judged_id] = used + 1
+                    node_spec = nodes_by_id.get(judged_id)
+                    if node_spec is None:
+                        raise ValueError(
+                            f"cannot retry '{judged_id}': node spec not available to the scheduler"
+                        )
+                    retry_spec = node_spec.model_copy(update={"deps": []})
+                    retried = self._run_work(
+                        [retry_spec],
+                        effective_goal,
+                        f"{graph_id}:retry{retries_used[judged_id]}",
+                        1,
+                    )
+                    results_by_id.update(retried)
+            elif decision in ("escalate", "stop"):
+                results_by_id[judged_id] = judged.model_copy(update={
+                    "status": "blocked",
+                    "observations": ((reason or f"judge_{decision}"),),
+                })
+
+            judge_status = "blocked" if decision in ("escalate", "stop") else "passed"
+            results_by_id[judge_node.node_id] = NodeResult(
+                node_id=judge_node.node_id,
+                status=judge_status,
+                observations=(reason,) if reason else (),
+                evidence_refs=(f"graph:{graph_id}:{judge_node.node_id}",),
+            )
+
+    def _strip_satisfied_deps(
+        self, nodes: list[NodeSpec], planner_ids: set[str]
+    ) -> list[NodeSpec]:
+        adjusted: list[NodeSpec] = []
+        for node in nodes:
+            if any(dep in planner_ids for dep in node.deps):
+                node = node.model_copy(
+                    update={"deps": [dep for dep in node.deps if dep not in planner_ids]}
+                )
+            adjusted.append(node)
+        return adjusted
+
+    def _run_work(
+        self,
+        nodes: list[NodeSpec],
+        goal: GoalSpec,
+        run_id: str,
+        max_parallel: int,
+    ) -> dict[str, NodeResult]:
+        work_spec = GraphSpec(
+            nodes=nodes,
+            max_parallel=max_parallel,
+            max_depth=1,
+            rationale=goal.goal,
+        )
+        controller = FleetController(
+            self.root,
+            runner_factory=self.runner_factory,
+            memory=self.memory,
+            clock=self.clock,
+        )
+        report = controller.run(goal, to_taskgraph(work_spec), run_id=run_id)
+        collected: dict[str, NodeResult] = {}
+        for outcome in report.task_outcomes:
+            status = outcome.status if outcome.status in _TERMINAL_STATUSES else "failed"
+            observations: tuple[str, ...] = ()
+            if status != "passed" and outcome.reason:
+                observations = (outcome.reason,)
+            collected[outcome.task_id] = NodeResult(
+                node_id=outcome.task_id,
+                status=status,
+                observations=observations,
+                evidence_refs=(f"run:{outcome.run_id}",),
+            )
+        return collected
 
     def _synthetic_goal(self, graph: GraphSpec) -> GoalSpec:
         """Minimal goal for executor-level invariants when the caller gives none."""
