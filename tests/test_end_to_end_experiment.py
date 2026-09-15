@@ -16,7 +16,7 @@ class FakeBaselineExecutor(TaskExecutor):
 
     name = "fake-baseline"
 
-    def execute(self, case: EvaluationCase, *, candidate_id: str | None = None) -> RunResult:
+    def execute(self, case: EvaluationCase, *, candidate_id: str | None = None, model: str | None = None) -> RunResult:
         return RunResult(
             run_id=f"baseline-{case.case_id}",
             goal=case.evidence_ref,
@@ -62,7 +62,7 @@ class LearnedExecutor(TaskExecutor):
         self.playbook = playbook
         self.ledger = ledger
 
-    def execute(self, case: EvaluationCase, *, candidate_id: str | None = None) -> RunResult:
+    def execute(self, case: EvaluationCase, *, candidate_id: str | None = None, model: str | None = None) -> RunResult:
         trial = run_playbook_trial(
             ledger=self.ledger,
             run_id=f"learned-{case.case_id}",

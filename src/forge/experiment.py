@@ -24,7 +24,21 @@ class TaskExecutor(Protocol):
 
     name: str
 
-    def execute(self, case: EvaluationCase, *, candidate_id: str | None = None) -> RunResult: ...
+    def execute(self, case: EvaluationCase, *, candidate_id: str | None = None, model: str | None = None) -> RunResult: ...
+
+
+class _PolicyProbe:
+    """Minimal request-shaped probe so the harness policy can validate an
+    experiment's model conditions without a full AORunRequest."""
+
+    def __init__(self, *, harness: str, mode: str, model: str | None):
+        self.harness = harness
+        self.mode = mode
+        self.model = model
+        self.max_polls = 0
+        self.poll_interval_s = 0.0
+        self.max_runtime_s = None
+        self.max_idle_s = 0.0
 
 
 @dataclass
@@ -43,6 +57,9 @@ class LearningExperiment:
     ledger: Ledger
     baseline_executor: TaskExecutor
     candidate_executor: TaskExecutor
+    baseline_model: str | None = None
+    candidate_model: str | None = None
+    policy: Any | None = None
     reflector: Callable[[dict[str, Any]], Any] | None = None
     playbook: Playbook | None = None
     tool_registry: ToolRegistry | None = None
@@ -55,6 +72,32 @@ class LearningExperiment:
     comparison: ComparisonResult | None = None
 
     def run(self) -> LearningExperiment:
+        # Harness policy is validated BEFORE any trial executes: a model
+        # outside the allowlist fails loud here, never as a downgraded run.
+        if self.policy is not None:
+            from .harness_policy import policy_hash
+
+            self.policy.validate_request(
+                _PolicyProbe(
+                    harness=self.goal.harness,
+                    mode="chat",
+                    model=self.baseline_model,
+                )
+            )
+            self.policy.validate_request(
+                _PolicyProbe(
+                    harness=self.goal.harness,
+                    mode="chat",
+                    model=self.candidate_model,
+                )
+            )
+            self.ledger.event(self.experiment_id, "model_condition", "experiment", {
+                "baseline_model": self.baseline_model,
+                "candidate_model": self.candidate_model,
+                "policy_hash": policy_hash(self.policy),
+                "harness": self.goal.harness,
+            })
+
         self.ledger.event(self.experiment_id, "experiment_started", "experiment", {
             "task_family": self.task_family,
             "goal": self.goal.goal,
@@ -65,7 +108,7 @@ class LearningExperiment:
         # Phase 1: Baseline trials
         self.baseline_results = []
         for case in self.train_cases:
-            result = self.baseline_executor.execute(case, candidate_id=None)
+            result = self.baseline_executor.execute(case, candidate_id=None, model=self.baseline_model)
             self.baseline_results.append(result)
             self.ledger.event(self.experiment_id, "trial_recorded", "experiment", {
                 "case_id": case.case_id,
@@ -100,8 +143,8 @@ class LearningExperiment:
                     candidate_id=self.candidate.skill_id,
                     train_cases=self.train_cases,
                     heldout_cases=self.heldout_cases,
-                    baseline_executor=lambda case, cid=None: self.baseline_executor.execute(case, candidate_id=cid).status == "passed",
-                    candidate_executor=lambda case, cid=None: self.candidate_executor.execute(case, candidate_id=cid).status == "passed",
+                    baseline_executor=lambda case, cid=None: self.baseline_executor.execute(case, candidate_id=cid, model=self.baseline_model).status == "passed",
+                    candidate_executor=lambda case, cid=None: self.candidate_executor.execute(case, candidate_id=cid, model=self.candidate_model).status == "passed",
                 )
                 self.gate_verdict = eval_run.verdict
                 self.ledger.event(self.experiment_id, "gate_verdict", "experiment", {
