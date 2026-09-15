@@ -50,3 +50,63 @@ def test_runner_serialization_is_json_safe(tmp_path: Path):
         smoke_tested={"opencode": True},
     ).to_dict()
     assert json.loads(json.dumps(report))["schema_version"] == "forge.harness-readiness.v1"
+
+
+# --------------------------------------------------------------------------
+# forge experiment --model-baseline/--model-candidate (model-variant A/B)
+# --------------------------------------------------------------------------
+
+
+def test_cli_experiment_rejects_nonallowlisted_model(capsys) -> None:
+    """The CLI must enforce the declared harness policy before running."""
+    import json
+    import tempfile
+    from pathlib import Path
+
+    from forge.cli import main_from_args_for_test
+
+    with tempfile.TemporaryDirectory() as tmp:
+        goal = Path(tmp) / "goal.json"
+        goal.write_text(json.dumps({
+            "goal": "model A/B via CLI",
+            "repo": tmp,
+            "acceptance": ["done"],
+            "harness": "opencode",
+        }))
+        code = main_from_args_for_test([
+            "experiment", "exp-cli-model-bad", str(goal),
+            "--model-candidate", "sketchy-model",
+        ])
+        out = json.loads(capsys.readouterr().out)
+
+    assert code == 1
+    assert out["ok"] is False
+    assert "model" in out.get("message", "").lower() or out.get("error") == "policy_violation"
+
+
+def test_cli_experiment_reports_model_condition(capsys) -> None:
+    """A policy-clean CLI run records the model condition in its output."""
+    import json
+    import tempfile
+    from pathlib import Path
+
+    from forge.cli import main_from_args_for_test
+
+    with tempfile.TemporaryDirectory() as tmp:
+        goal = Path(tmp) / "goal.json"
+        goal.write_text(json.dumps({
+            "goal": "model A/B via CLI",
+            "repo": tmp,
+            "acceptance": ["done"],
+            "harness": "opencode",
+        }))
+        code = main_from_args_for_test([
+            "experiment", "exp-cli-model-ok", str(goal),
+            "--model-candidate", "nvidia/abacusai/dracarys-llama-3.1-70b-instruct",
+        ])
+        out = json.loads(capsys.readouterr().out)
+
+    assert code == 0
+    assert out["ok"] is True
+    assert out["model_condition"]["candidate_model"] == "nvidia/abacusai/dracarys-llama-3.1-70b-instruct"
+    assert out["model_condition"]["policy_hash"]

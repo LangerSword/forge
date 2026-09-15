@@ -155,8 +155,15 @@ def cmd_dashboard(port: int) -> int:
         server.server_close()
 
 
-def cmd_experiment(experiment_id: str, goal_file: str) -> int:
-    """Run a deterministic learning experiment with a local executor."""
+def cmd_experiment(experiment_id: str, goal_file: str, *, model_baseline: str | None = None,
+                   model_candidate: str | None = None) -> int:
+    """Run a deterministic learning experiment with a local executor.
+
+    With model kwargs and the declared harness policy, this is the
+    model-variant A/B: conditions are validated against the policy BEFORE
+    any trial executes, and the model_condition (both models + policy_hash)
+    is recorded to the ledger and reported.
+    """
     try:
         goal = GoalSpec.model_validate_json(Path(goal_file).read_text())
     except Exception as exc:
@@ -164,6 +171,12 @@ def cmd_experiment(experiment_id: str, goal_file: str) -> int:
                           "error": "invalid_goal", "message": str(exc)}, indent=2))
         return 1
     from .evaluation import EvaluationCase
+    from .harness_policy import HarnessPolicy, HarnessPolicyError, policy_hash
+
+    policy: HarnessPolicy | None = None
+    policy_path = root() / ".forge" / "harness-policy.json"
+    if (model_baseline is not None or model_candidate is not None) and policy_path.exists():
+        policy = HarnessPolicy.load(policy_path)
     ledger = Ledger(root())
     experiment = LearningExperiment(
         experiment_id=experiment_id,
@@ -174,8 +187,16 @@ def cmd_experiment(experiment_id: str, goal_file: str) -> int:
         ledger=ledger,
         baseline_executor=_default_task_executor(),
         candidate_executor=_default_task_executor(),
+        baseline_model=model_baseline,
+        candidate_model=model_candidate,
+        policy=policy,
     )
-    result = experiment.run()
+    try:
+        result = experiment.run()
+    except HarnessPolicyError as exc:
+        print(json.dumps({"schema_version": "forge.experiment.v1", "ok": False,
+                          "error": "policy_violation", "message": str(exc)[:500]}, indent=2))
+        return 1
     output = {
         "schema_version": "forge.experiment.v1", "ok": True,
         "experiment_id": result.experiment_id,
@@ -184,6 +205,12 @@ def cmd_experiment(experiment_id: str, goal_file: str) -> int:
         "candidate": result.candidate.skill_id if result.candidate else None,
         "gate_status": result.gate_verdict.status if result.gate_verdict else None,
     }
+    if model_baseline is not None or model_candidate is not None:
+        output["model_condition"] = {
+            "baseline_model": model_baseline,
+            "candidate_model": model_candidate,
+            "policy_hash": policy_hash(policy) if policy else None,
+        }
     if result.comparison:
         output["comparison"] = {
             "improved": result.comparison.improved,
@@ -228,7 +255,7 @@ def cmd_graph(goal_file: str) -> int:
 def _default_task_executor():
     class SimpleExecutor:
         name = "cli-executor"
-        def execute(self, case, *, candidate_id=None):
+        def execute(self, case, *, candidate_id=None, model=None):
             from .schema import RunResult
             return RunResult(
                 run_id=f"cli-trial-{case.case_id}",
@@ -280,6 +307,8 @@ def main(argv: list[str] | None = None) -> int:
     exp.add_argument("experiment_id", help="experiment identifier")
     exp.add_argument("goal_file", help="path to GoalSpec JSON file")
     exp.add_argument("--trials", type=int, default=3, help="number of trials per condition")
+    exp.add_argument("--model-baseline", default=None, help="pinned baseline model (model-variant A/B; policy-checked)")
+    exp.add_argument("--model-candidate", default=None, help="pinned candidate model (model-variant A/B; policy-checked)")
     sub.add_parser("experiments", help="list completed experiments")
     graph_cmd = sub.add_parser("graph", help="compile a goal into its typed execution graph")
     graph_cmd.add_argument("goal_file", help="path to GoalSpec JSON file")
@@ -352,7 +381,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "dashboard":
         return cmd_dashboard(args.port)
     if args.command == "experiment":
-        return cmd_experiment(args.experiment_id, args.goal_file)
+        return cmd_experiment(
+            args.experiment_id, args.goal_file,
+            model_baseline=args.model_baseline,
+            model_candidate=args.model_candidate,
+        )
     if args.command == "experiments":
         return cmd_experiments()
     if args.command == "graph":
