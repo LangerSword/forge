@@ -694,37 +694,61 @@ not progress.
 
 ## 9. Next work (not in this plan)
 
-All seven planned tasks are merged (full suite **193 passed**). What is
-genuinely still open, in priority order:
+All seven planned tasks are merged. Since this list was written, the
+resolved/retired items are recorded below — do not reopen them without
+evidence they regressed. What is genuinely still open, in priority order:
 
-1. **Live AO worker completion (blocker).** The AO daemon was not running at
-   the end of this build, and the earlier live OpenCode worker produced no
-   artifact (no_op). Until a real worker produces a fresh, independently
-   verified artifact, no autonomous-completion claim is allowed. Investigate
-   worker-side (prompt shape, ACP session, model/tool availability) — not more
-   controller logic.
-2. **Planner checkpointing.** `resume=True` covers work nodes only; a resumed
+1. **Model-variant A/B through the harness policy (next experiment).** The
+   unified-harness policy (0.2.4) made "different model" a labeled, pinned
+   condition: same harness, different allowlisted model (`--model`), skill vs
+   no-skill. The gate measures the improvement; `policy_hash` keeps the runs
+   comparable.
+2. **Real (LLM) judge implementations.** Judge nodes accept any callable
+   returning a decision. The deterministic judge used in tests is a stub; an
+   LLM judge (evidence sufficiency, tool choice, plan quality) is the next
+   layer — and it must stay constrained by the same
+   `continue/retry/reroute/escalate/stop` vocabulary plus deterministic
+   policy around it. **The grader for Forge's own verdict systems is already
+   built:** `src/forge/review.py` scores the promotion gate (1800-case
+   boundary sweep), the controller truth table, the judge-routing matrix,
+   AND the harness-policy contract/enforcement order (4 suites) against
+   independent, code-computed oracles (`run_review`), persisting
+   per-dimension rates and per-case failure detail — see `forge review`.
+   When a real (LLM) judge lands, its routing decisions plug into the same
+   `routing_suite` matrix and are measured, not asserted.
+3. **Planner checkpointing.** `resume=True` covers work nodes only; a resumed
    graph re-expands its planners. Store the expanded subgraph spec so resume
    can skip re-expansion.
-3. **Real judge implementations.** Judge nodes accept any callable returning a
-   decision. The deterministic judge used in tests is a stub; an LLM judge
-   (evidence sufficiency, tool choice, plan quality) is the next layer — and it
-   must stay constrained by the same `continue/retry/reroute/escalate/stop`
-   vocabulary plus deterministic policy around it. **The grader for Forge's own
-   verdict systems is already built:** `src/forge/review.py` scores the
-   promotion gate (1800-case boundary sweep), the controller truth table, and
-   the judge-routing matrix against independent, code-computed oracles
-   (`run_review`), persisting per-dimension rates and per-case failure detail —
-   see `forge review`. When a real (LLM) judge lands, its routing decisions plug
-   into the same `routing_suite` matrix and are measured, not asserted.
 4. **Verify the Supermemory adapter against the live service.** Endpoint
    shapes follow the documented pattern but have only been exercised against a
    fake client. Wire `build_memory_adapter()` into the CLI/scheduler entry
-   points and read back a real write/recall.
+   points and read back a real write/recall. (Forge's Neatlogs mirror
+   boundary is the same pattern: local-first trace sinks are authoritative;
+   the external mirror stays fail-loud until an ingestion contract is
+   supplied — never silently fake delivery.)
 5. **Wire the scheduler into the CLI.** `forge graph` compiles a graph, but
    nothing runs it end-to-end from the CLI yet. Add `forge run-graph
    <goal.json>` that builds a scheduler with the selected memory backend.
-6. **Second harness** (Codex or Claude Code) installed + smoke-tested, then a
-   transfer run: same goal, fresh harness, validated playbook recalled from the
-   fabric. This is the cross-harness proof point and it is still unproven.
+6. **Fix the publish-npm workflow** (failing since 2026-09-07) before pushing
+   the current stack; the product site/package are the visible surface.
+
+### Resolved since this list was written (do not reopen as "open")
+
+- **Live AO worker completion — RESOLVED (2026-09-15).** Two bounded live
+  spawns through Forge's real runner produced fresh, independently verified
+  artifacts: session `forge-14` (`ao-live-smoke-20260915-v2`,
+  `docs/SMOKE.md`, sha256 `1b37e8cb…`, verdict `passed`, ~11.5s
+  spawn-to-verified, session cleaned up). Exact payload + completion signal
+  in `.forge/ao-surface.json` `forge_daemon`. The root cause of the earlier
+  no-op era was partly Forge-side: `resolve_binary()` gated daemon discovery
+  on a hardcoded AppImage path (fixed, commit `c0d53ec`). Proves one bounded
+  autonomous completion; multi-worker fleet runs remain unproven.
+- **Second harness / cross-harness transfer — RETIRED as a measured claim
+  (0.2.4).** Replaced by the unified harness policy: variance pinned by
+  construction (declared `HarnessPolicy`, enforced before spawn,
+  `policy_hash` comparability in the ledger) rather than measured on a
+  second harness Forge does not run. Skills are portable by design
+  (harness-agnostic `ContextPackage`); a transfer run stays one spawn away
+  if a second CLI is ever installed.
+
 
