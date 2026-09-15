@@ -1,6 +1,6 @@
 # Forge — Spec Sheet
 
-**Version:** 0.2.4 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-15
+**Version:** 0.2.5 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-15
 **Track:** Syndicate by Maximor — Track 1: Automated Agent Engineering
 **Deadline:** 2026-09-07 03:30 IST (Devpost)
 **Working dir:** `~/forge` · **Remote:** `https://github.com/LangerSword/forge`
@@ -630,3 +630,19 @@ unattended production deployment.
   created). Cross-harness transfer is retired as a measured claim: skills
   are portable by design (harness-agnostic `ContextPackage`/skill format),
   improvement is measured on the unified harness. 227 tests pass (8 new).
+- **0.2.5** (2026-09-15): model-variant A/B through the harness policy —
+  the next experiment from §9 is now executable. `LearningExperiment`
+  gains `baseline_model`/`candidate_model`/`policy`: both model conditions
+  are validated against the policy BEFORE any trial executes (a model
+  outside the allowlist fails loud, no trials run), and a
+  `model_condition` event (both models + `policy_hash`) is recorded to
+  the ledger — the pinned model A/B is a labeled, comparable condition.
+  `ModelABExecutor` (`src/forge/model_ab.py`) runs each trial as a bounded
+  AO worker through the real runner under the policy: unique run ids per
+  trial, verifier authority unchanged (pass requires fresh artifact +
+  independent verifier), violating model rejected before spawn.
+  `forge experiment <id> <goal.json> --model-baseline <m> --model-candidate
+  <m>` wires the A/B end to end from the CLI; live runs verified (clean
+  run records `model_condition` with `policy_hash 6630d9005689faf5`;
+  nonallowlisted model exits 1 `policy_violation` before any trial). 236
+  tests pass (9 new).

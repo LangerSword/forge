@@ -816,3 +816,55 @@ policy file loads: harness opencode, models ('nvidia/', 'deepseek/',
 Model-variant A/B through the policy (next experiment), live Supermemory
 backend, multi-worker fleet runs. Cross-harness transfer is retired as a
 measured claim, not an open blocker.
+
+## 2026-09-15 — Model-variant A/B through the harness policy (0.2.5)
+
+- **Type:** milestone / experiment capability
+- **Status:** observed (236 tests; live CLI runs — clean + rejection)
+- **Agents/harnesses:** Forge core, pytest, local executor (live CLI)
+- **Scope:** `experiment.py`, `model_ab.py`, `cli.py`, `evals/goals/model-ab-trial-v1.json`
+
+### What was built
+
+The §9 next experiment is now executable: **model-variant A/B** — same
+harness (opencode, pinned), different allowlisted model, skill vs no-skill.
+
+- `LearningExperiment` gains `baseline_model`/`candidate_model`/`policy`:
+  both model conditions are validated against the policy BEFORE any trial
+  executes (violating model → fail loud, zero trials), and a
+  `model_condition` event (both models + `policy_hash`) is recorded to the
+  ledger.
+- `ModelABExecutor` (`src/forge/model_ab.py`) — the AO-backed executor:
+  each trial is a bounded spawn through the real runner under the policy;
+  unique run ids (`run_prefix:case_id:attempt`); verifier authority
+  unchanged (fresh artifact + independent verifier required for a pass).
+- CLI: `forge experiment <id> <goal.json> --model-baseline <m>
+  --model-candidate <m>` — policy enforced at the CLI boundary too
+  (nonallowlisted model → exit 1, `policy_violation`).
+
+### Evidence
+
+```text
+uv run pytest -q → 236 passed (9 new)
+forge experiment exp-model-ab-live evals/goals/model-ab-trial-v1.json
+  --model-candidate nvidia/abacusai/dracarys-llama-3.1-70b-instruct
+  → ok, model_condition {baseline: null, candidate: nvidia/…,
+    policy_hash: 6630d9005689faf5}
+forge experiment … --model-candidate totally-sketchy-model
+  → exit 1, policy_violation: model is not allowlisted (before any trial)
+```
+
+### Bugs found while building
+
+- The gate's evidence-refs rule requires >=3 refs: a 1-train/1-heldout
+  sweep yields 2 refs → always rejected. The A/B test uses 2 train + 3
+  heldout cases so the gate can validate.
+- `parse_spawn_output` is fail-loud on empty spawn output (by design);
+  fakes must emit a parseable session line.
+
+### What stays open
+
+Running the A/B for real: a live skill-vs-no-skill comparison through
+`ModelABExecutor` (bounded AO spawns, both conditions), then the gate
+measures the improvement. Supermemory live service, planner
+checkpointing, `forge run-graph`, publish-npm fix.
