@@ -159,11 +159,15 @@ python -m forge.cli review
 
 # 5. dashboard
 python -m forge.cli dashboard
+
+# 6. cockpit (Go TUI): build once, then `forge-tui` from anywhere
+cd tui && go build -o ~/.local/bin/forge-tui . && forge-tui
 ```
 
 ## Product surfaces and deployment
 
-Forge is packaged as a project-local Python CLI plus a local web dashboard;
+Forge is packaged as a project-local Python CLI, a local web dashboard, and
+a Go/bubbletea cockpit (`tui/` → `forge-tui`, reading the same JSON surface);
 it is not a second Kanban competing with AO. The target topology has AO
 supervise workers and worktrees, while Forge owns the ledger, learning gate,
 evidence, and deployment policy. In the current checkout, Forge owns the AO lifecycle

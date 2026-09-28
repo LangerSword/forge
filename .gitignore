@@ -24,3 +24,7 @@ recording.mkv
 
 # agent-local working state (plans are mirrored into docs/plans/)
 .hermes/
+
+# Go TUI build artifacts
+tui/forge-tui
+tui/dist/

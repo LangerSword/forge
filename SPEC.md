@@ -1,6 +1,6 @@
 # Forge — Spec Sheet
 
-**Version:** 0.2.6 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-28
+**Version:** 0.2.7 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-28
 **Track:** Syndicate by Maximor — Track 1: Automated Agent Engineering
 **Deadline:** 2026-09-07 03:30 IST (Devpost)
 **Working dir:** `~/forge` · **Remote:** `https://github.com/LangerSword/forge`
@@ -655,3 +655,13 @@ unattended production deployment.
   error). Live fleet runs preflight the daemon; the bounded live smoke is
   repeatable (`scripts/ao_live_smoke.py`; session `forge-15`, sha256
   `3bf5f1f1…`). 258 tests pass (22 new).
+- **0.2.7** (2026-09-28): markdown goal ingestion + the forge-tui cockpit.
+  `plan`/`graph`/`fleet`/`experiment` accept `.md` plans via a deterministic
+  mapping (front matter skipped; Goal/Acceptance sections; Repo/Harness/
+  Artifact/Max labels; repo defaults to cwd, harness falls back to
+  `.forge/harness-policy.json`) — verified live against a real plan (11
+  acceptance items extracted). Missing files fail with a path-and-fix
+  message instead of a bare FileNotFoundError. New `tui/` (Go, bubbletea +
+  lipgloss + bubbles): status / runs+detail / ao / review cockpit over the
+  same JSON surface, with `--dump` for non-interactive verification.
+  269 Python tests pass (11 new); go build/vet/test clean.

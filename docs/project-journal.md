@@ -927,3 +927,47 @@ The model-variant A/B for real (a live skill-vs-no-skill comparison through
 before pushing. The desktop entry `Exec=` still points at the stale
 `~/.local/bin/agent-orchestrator-linux-x64.AppImage` (launching AO from the
 app menu may fail; the daemon now starts via `forge ao start`).
+
+## 2026-09-28 — Markdown goal ingestion + the forge-tui cockpit (0.2.7)
+
+- **Type:** feature / product surface
+- **Status:** observed (269 Python tests; go build/vet/test green; live runs)
+- **Agents/harnesses:** Forge core, pytest, Go 1.27, bubbletea/lipgloss/bubbles
+- **Scope:** `src/forge/goal_input.py`, `tests/test_goal_input.py`, `cli.py`
+  wiring, `tui/`
+
+### Why
+
+Pointing `forge plan` at a human-written plan (a real OMH `.md`) failed twice
+over: a relative path died as a bare `FileNotFoundError`, and the absolute
+path died as pydantic speaking JSON at a markdown file. Human plans in,
+machine graphs out — that is the contract now.
+
+### What was built
+
+1. **Markdown goal ingestion** (`bd80e0a`): deterministic mapping — front
+   matter skipped; `Goal`/`Acceptance` sections; `Repo:` / `Harness:` /
+   `Artifact:` / `Max minutes:` labels; repo defaults to cwd; harness falls
+   back to `.forge/harness-policy.json`; `- [ ]` markers stripped. Fail-loud,
+   never a guessed goal. Missing files name the path and the fix.
+2. **`tui/` — forge-tui**: Go/bubbletea cockpit over the same JSON CLI
+   surface (no second state model): status, runs + run detail (event
+   viewport), AO daemon + harnesses, review self-grading, help. Spinner for
+   loads, colored status cells, `--dump` snapshot mode for CI/verification.
+
+### Evidence
+
+```text
+uv run pytest -q -> 269 passed (11 new)
+forge plan <real plan>.md -> ok:true; 11 acceptance items; harness opencode; exit 0
+forge plan nope.md        -> "goal file not found ... use an absolute path"
+tui: go build OK · go vet OK · go test ok
+forge-tui --dump -> live: 106 runs / 88673 events; daemon ok; review all_suites_100=true
+pty run -> rendered frame (status page, 27-agent catalog) + clean quit on q
+```
+
+### What stays open
+
+Model-variant A/B for real; `forge run-graph`; decision engine (Jev/Kev
+contract); TUI next increments (glamour plan viewer, list/table widgets,
+in-TUI plan compile). The cockpit's look is pending the user running it.
