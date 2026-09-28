@@ -1,6 +1,6 @@
 # Forge — Spec Sheet
 
-**Version:** 0.2.9 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-28
+**Version:** 0.2.10 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-28
 **Scope:** commander agent with verified, cumulative learning — every claim in
 this file is marked observed or target; see §Status for the current boundary.
 **Working dir:** `~/forge` · **Remote:** `https://github.com/LangerSword/forge`
@@ -669,6 +669,11 @@ unattended production deployment.
   invocation (and the explicit `forge tui`) execs into forge-tui; a missing
   binary or a non-tty context fails loud with the fix. 274 Python tests
   pass (5 new).
+- **0.2.10** (2026-09-28): worktree discovery uses the goal's repo
+  (`AORunRequest.repo`); the artifact checkpoint gets a second-checkpoint
+  grace after the nudge and scales with the goal budget
+  (`max(90, max_minutes x 30)`); live proof — `graph-a40d2605` built
+  `~/projects/todo` end-to-end (sessions `todo-7` / `todo-8`). 284 tests.
 - **0.2.9** (2026-09-28): `forge run-graph` — compile a goal (JSON or `.md`
   plan) into its typed graph and execute it live through the recursive
   scheduler with AO workers; every node runs behind its own deterministic

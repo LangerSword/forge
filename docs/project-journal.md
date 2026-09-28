@@ -1021,3 +1021,46 @@ allow_once / allow_always / reject). Runner-side handling — detect a pending
 approval on `needs_input` and resolve it (deny outside-worktree by default)
 instead of nudging into a wall — is the principled follow-up for environments
 that keep permission gates on.
+
+## 2026-09-28 (2) — the todo website: first run on a repo of its own making (0.2.10)
+
+- **Type:** live orchestration on a new repo / three fixed blockers
+- **Status:** observed — `graph-a40d2605` passed (both nodes); site committed to `~/projects/todo` (`606f1b9`)
+
+`forge run-graph evals/goals/todo-website-v1.md` against `~/projects/todo`
+(registered with `ao project add`; a remote-less local repo). `goal` (session
+`todo-7`) wrote `index.html` + `styles.css` + `app.js` and passed all six
+deterministic checks in 2m41s; `goal-verify` (session `todo-8`) re-produced the
+artifact independently and passed in 4m16s; ~7 minutes end-to-end. The two
+artifacts carry different hashes — same spec, two workers, two independent
+reproductions — and the goal node's copy is what landed in the repo.
+
+Three blockers, root-caused live and now covered by regression tests (284 total):
+
+1. **Remote-less repos have no resolvable default branch** — `ao spawn` fails
+   `DEFAULT_BRANCH_UNRESOLVED` unless the repo has a remote or a recorded
+   default. Fix: `ao project set-config <id> --default-branch main` (full
+   `--config-json`; `set-config` replaces the whole object).
+2. **Worktree discovery searched the wrong repo** — `AOCLI.discover_worktree`
+   ran `git worktree list` in Forge's cwd, so for any goal repo other than
+   `~/forge` the worktree was never found and the watchdog killed healthy
+   workers (`working without a worktree past liveness budget`). Fix:
+   `discover_worktree(session_id, *, cwd=...)` + `AORunRequest.repo` plumbed
+   from `FleetController` (commit `9dee4e4`).
+3. **Nudge-then-instant-kill geometry** — the artifact checkpoint killed on
+   the very next poll (~1s after the nudge), which no model can act on; the
+   checkpoint was also a fixed 90s tuned for tiny tasks. Fix: kill only after
+   a full second checkpoint (`2x max_idle_s`), and
+   `max_idle_s = max(90, goal.max_minutes x 30)` (commit `5ca38eb`).
+
+**Ops lesson:** a foreground `run-graph` whose wrapper timeout fires leaves an
+orphaned worker and a ledger run stuck at `running` (`graph-73b66b26:work:1:goal-verify`
+is that artifact). Long-bound runs belong in the background with ledger
+collection.
+
+**Observed bonus:** a verifier worker (session `todo-6`) went beyond the
+deterministic gate on its own — it built a chromium acceptance harness under
+`/tmp/opencode/verify`, found its own harness bugs, and was pinning down
+focus/Enter semantics before the orphaned run was stopped. Independent
+verification already reaches for a real browser; the typed graph's verifier
+node is pointed the right way.

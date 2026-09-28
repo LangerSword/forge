@@ -1,6 +1,6 @@
 # Forge — a commander agent with verified, cumulative learning
 
-**v0.2.9** · every claim in this repo is marked *observed* or *target* — the
+**v0.2.10** · every claim in this repo is marked *observed* or *target* — the
 journal is the receipt trail: [docs/project-journal.md](docs/project-journal.md)
 
 Forge compiles a goal into a **typed execution graph**, runs it as a bounded

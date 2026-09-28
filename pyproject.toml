@@ -1,6 +1,6 @@
 [project]
 name = "forge-agent-fleet"
-version = "0.2.9"
+version = "0.2.10"
 description = "Evidence-gated learning layer for AO-managed agent fleets"
 readme = "README.md"
 requires-python = ">=3.11"
