@@ -361,6 +361,7 @@ class FleetController:
                     repo=Path(goal.repo),
                     max_polls=max(1, int(goal.max_minutes * 60)),
                     max_runtime_s=goal.max_minutes * 60,
+                    max_idle_s=max(90.0, goal.max_minutes * 30.0),
                     independent_verifier=self.verifier_factory(goal, task),
                     existing_session_id=(
                         (self.ledger.latest_event(task_run_id, "spawn_result") or {}).get("payload", {}).get("session_id")

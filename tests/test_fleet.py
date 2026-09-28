@@ -628,3 +628,26 @@ def test_controller_survives_learning_hook_exception(tmp_path: Path) -> None:
     kinds = [event["kind"] for event in controller.ledger.events_for_run("fleet-hook-error")]
     assert "verdict" in kinds
     assert "reflection_error" in kinds
+
+
+def test_controller_scales_worker_checkpoint_with_goal_budget(tmp_path: Path):
+    requests: list = []
+
+    def runner_factory(request):
+        requests.append(request)
+        return SimpleNamespace(
+            run=lambda _request: SimpleNamespace(
+                status="passed",
+                session_id="session-checkpoint",
+                reason="ok",
+                artifact_exists=True,
+                verification_passed=True,
+                classification=SimpleNamespace(value="passed"),
+            )
+        )
+
+    controller = FleetController(tmp_path, runner_factory=runner_factory)
+    g = goal()
+    controller.run(g, TaskGraph(tasks=[task("a")], max_parallel=1), run_id="fleet-checkpoint")
+    assert requests, "expected a live request"
+    assert requests[0].max_idle_s == max(90.0, g.max_minutes * 30.0)

@@ -42,15 +42,27 @@ def test_verified_artifact_wins_over_idle_state():
     assert not d.should_kill
 
 
-def test_working_without_changes_gets_one_nudge_then_kill():
+def test_working_without_changes_gets_one_nudge_then_kill_after_second_checkpoint():
     o = obs(snapshot=SessionSnapshot("ao-1", "working", "active", 100, 100), changed_files=())
     d = classify_worker(o)
     assert d.classification == WorkerClassification.NO_OP
     assert d.should_nudge and not d.should_kill
 
+    # The nudge has been sent; within the second checkpoint the worker still
+    # gets room instead of an immediate kill.
     o2 = obs(snapshot=o.snapshot, changed_files=(), nudge_count=1)
     d2 = classify_worker(o2)
-    assert d2.should_kill
+    assert d2.classification == WorkerClassification.WORKING
+    assert not d2.should_kill and not d2.should_nudge
+
+    # A full second checkpoint with no progress: stop it.
+    o3 = obs(
+        snapshot=SessionSnapshot("ao-1", "working", "active", 185, 180),
+        changed_files=(),
+        nudge_count=1,
+    )
+    d3 = classify_worker(o3)
+    assert d3.should_kill
 
 
 def test_hidden_needs_input_gets_one_nudge_then_kill():
@@ -79,5 +91,13 @@ def test_apply_decision_has_bounded_side_effect():
 
     o2 = obs(snapshot=o.snapshot, changed_files=(), nudge_count=1)
     d2 = classify_worker(o2)
-    apply_decision(ao, o2, d2, nudge="unused")
+    assert not d2.should_kill
+
+    o3 = obs(
+        snapshot=SessionSnapshot("ao-1", "working", "active", 185, 180),
+        changed_files=(),
+        nudge_count=1,
+    )
+    d3 = classify_worker(o3)
+    apply_decision(ao, o3, d3, nudge="unused")
     assert ao.killed == ["ao-1"]

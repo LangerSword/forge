@@ -76,7 +76,9 @@ def classify_worker(obs: WorkerObservation, *, max_idle_s: float = 90.0) -> Watc
         if obs.worktree_exists and not obs.changed_files and s.elapsed_s >= max_idle_s:
             if obs.nudge_count == 0:
                 return WatchdogDecision(WorkerClassification.NO_OP, should_nudge=True, reason="working with no changed files past artifact checkpoint")
-            return WatchdogDecision(WorkerClassification.NO_OP, should_kill=True, reason="no changed files after one nudge")
+            if s.elapsed_s >= 2.0 * max_idle_s:
+                return WatchdogDecision(WorkerClassification.NO_OP, should_kill=True, reason="no changed files after one nudge and a second checkpoint")
+            return WatchdogDecision(WorkerClassification.WORKING, reason="awaiting worker progress after nudge within second checkpoint")
         return WatchdogDecision(WorkerClassification.WORKING, reason="worker active within artifact checkpoint")
     if s.status == "idle":
         if obs.artifact_exists and not obs.verification_passed:
