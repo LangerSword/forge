@@ -1,6 +1,6 @@
 # Forge — a commander agent with verified, cumulative learning
 
-**v0.2.10** · every claim in this repo is marked *observed* or *target* — the
+**v0.2.11** · every claim in this repo is marked *observed* or *target* — the
 journal is the receipt trail: [docs/project-journal.md](docs/project-journal.md)
 
 Forge compiles a goal into a **typed execution graph**, runs it as a bounded
@@ -32,6 +32,10 @@ passes, and every event is replayable with `forge run <run_id>`.
 `forge-20`, each wrote `docs/QUICKSTART.md` in its own worktree and passed
 all four deterministic checks; 2m04s end-to-end. That file is in this repo
 now, promoted from a worker's worktree after review.
+
+**Or drive it from the cockpit:** bare `forge` → page **3 orchestrate** —
+pick a goal file, hit enter, and the same run streams live (node rows,
+events, verdict).
 
 ## Status and evidence boundary
 

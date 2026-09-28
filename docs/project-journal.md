@@ -1064,3 +1064,32 @@ deterministic gate on its own — it built a chromium acceptance harness under
 focus/Enter semantics before the orphaned run was stopped. Independent
 verification already reaches for a real browser; the typed graph's verifier
 node is pointed the right way.
+
+## 2026-09-28 (3) — the cockpit can launch work (0.2.11)
+
+- **Type:** TUI control surface / live findings
+- **Status:** observed (pty-verified: launched `quickstart-doc-v1.md` from
+  page 3, streamed `forge-21`, verdict rendered, clean exit on `q`)
+
+`forge` → page **3 orchestrate**: goal files from `evals/goals/`, enter launches
+`forge run-graph` as the same CLI a human runs; the page then streams the live
+run (node rows, event tail, final verdict) off `forge runs` / `forge run` JSON
+on a 2s ticker. 3 Go tests added.
+
+Two live findings while exercising it:
+
+1. **Edit-tasks trip the freshness gate.** A todo-site fix run (session
+   `todo-9`, launched by the user from `~`) edited `app.js`/`styles.css` for
+   ten minutes — real fixes for real bugs (dead checkbox clicks, edit-focus
+   loss) — but the checked artifact `index.html` never changed, so
+   `stale_artifact` held for 358 polls and the run stopped at the 600s runtime
+   budget. The fixes are preserved: `~/.ao/data/worktrees/todo/todo-9`
+   (uncommitted, `+64/-11`, syntax-checked). The correct fix is verification
+   design for edit tasks (behavioral checks/tests — todo plan phase 5), not a
+   looser freshness rule; `artifact_fresh or changed_files` would rubber-stamp
+   unverified edits.
+2. **One `ao spawn` TimeoutExpired** under load (verify node of the
+   pty-verified run) — retry/backoff on spawn is the follow-up.
+
+Ops note: runs launched from `~` keep their ledger in `~/.forge`; the cockpit
+(root `~/forge`) shows the forge ledger. Run from `~/forge`, or launch page 3.

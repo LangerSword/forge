@@ -23,12 +23,13 @@ type page int
 const (
 	pageStatus page = iota
 	pageRuns
+	pageOrchestrate
 	pageAO
 	pageReview
 	pageHelp
 )
 
-var pageNames = []string{"status", "runs", "ao", "review", "help"}
+var pageNames = []string{"status", "runs", "orchestrate", "ao", "review", "help"}
 
 const (
 	colFg     = lipgloss.Color("#D7D7DE")
@@ -83,6 +84,7 @@ type model struct {
 	aoNote string
 
 	review ReviewData
+	orch   orchState
 	err    error
 }
 
@@ -115,6 +117,9 @@ func loadTabCmd(root string, tab page) tea.Cmd {
 			return loadedMsg{tab: tab, data: d, note: note, err: err}
 		case pageReview:
 			d, err := LoadReview(root)
+			return loadedMsg{tab: tab, data: d, err: err}
+		case pageOrchestrate:
+			d, err := LoadGoals(root)
 			return loadedMsg{tab: tab, data: d, err: err}
 		}
 		return loadedMsg{tab: tab}
@@ -171,6 +176,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if d, ok := msg.data.(ReviewData); ok {
 					m.review = d
 				}
+			case pageOrchestrate:
+				if goals, ok := msg.data.([]string); ok {
+					m.orch.Goals = goals
+					if m.orch.GoalSel >= len(goals) {
+						m.orch.GoalSel = max(0, len(goals)-1)
+					}
+				}
 			}
 		}
 		return m, nil
@@ -186,6 +198,55 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.events.SetContent(renderEvents(m.detail.Events))
 		m.events.SetYOffset(0)
 		m.resizeDetailViewport()
+		return m, nil
+	case orchSnapshotMsg:
+		m.orch.Waiting = true
+		m.orch.Known = msg.known
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		if len(m.orch.Goals) == 0 {
+			return m, nil
+		}
+		return m, tea.Batch(startRunGraphCmd(m.root, m.orch.Goals[m.orch.GoalSel]), orchTickCmd())
+	case orchTickMsg:
+		if m.orch.Active == "" && !m.orch.Waiting {
+			return m, nil
+		}
+		if m.orch.Active != "" && m.orchTerminal() {
+			return m, nil
+		}
+		return m, pollOrchCmd(m.root, m.orch.Active, m.orch.Known)
+	case orchPollMsg:
+		m.orch.Runs = msg.Runs
+		if msg.Active != "" {
+			m.orch.Active = msg.Active
+		}
+		if msg.Detail.Run.RunID != "" {
+			m.orch.Detail = msg.Detail
+		}
+		if msg.Err != nil {
+			m.err = msg.Err
+		}
+		if m.orch.Active != "" && !m.orchTerminal() {
+			return m, orchTickCmd()
+		}
+		return m, nil
+	case orchDoneMsg:
+		m.orch.Waiting = false
+		m.orch.DoneErr = ""
+		if msg.Status != "" {
+			m.orch.DoneStatus = msg.Status
+		} else if msg.OK {
+			m.orch.DoneStatus = "passed"
+		} else if m.orch.DoneStatus == "" {
+			m.orch.DoneStatus = "failed"
+		}
+		if msg.Err != nil {
+			m.orch.DoneErr = msg.Err.Error()
+		}
+		m.orch.LogPath = msg.LogPath
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -207,9 +268,13 @@ func (m *model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		if m.detail != nil {
 			m.detail = nil
+			return m, nil
+		}
+		if m.tab == pageOrchestrate && m.orch.DoneStatus != "" {
+			m.orch = orchState{Goals: m.orch.Goals}
 		}
 		return m, nil
-	case "1", "2", "3", "4", "5":
+	case "1", "2", "3", "4", "5", "6":
 		idx := page(int(key[0] - '1'))
 		if m.tab != idx {
 			m.tab = idx
@@ -232,6 +297,9 @@ func (m *model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.runSel--
 				m.runOff = adjustOffset(m.runSel, m.runOff, m.runsVisible())
 			}
+			if m.tab == pageOrchestrate && m.orch.Active == "" && !m.orch.Waiting && m.orch.GoalSel > 0 {
+				m.orch.GoalSel--
+			}
 			return m, nil
 		}
 	case "down", "j":
@@ -240,12 +308,18 @@ func (m *model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.runSel++
 				m.runOff = adjustOffset(m.runSel, m.runOff, m.runsVisible())
 			}
+			if m.tab == pageOrchestrate && m.orch.Active == "" && !m.orch.Waiting && m.orch.GoalSel < len(m.orch.Goals)-1 {
+				m.orch.GoalSel++
+			}
 			return m, nil
 		}
 	case "enter":
 		if m.tab == pageRuns && m.detail == nil && len(m.runs) > 0 {
 			m.load = true
 			return m, tea.Batch(m.spin.Tick, openRunCmd(m.root, m.runs[m.runSel].RunID))
+		}
+		if m.tab == pageOrchestrate && m.detail == nil && m.orch.Active == "" && !m.orch.Waiting && len(m.orch.Goals) > 0 {
+			return m, snapshotRunsCmd(m.root)
 		}
 		return m, nil
 	}
@@ -275,7 +349,7 @@ func (m *model) View() string {
 		m.renderHeader(),
 		m.renderTabs(),
 		m.renderBody(),
-		styleSoft.Render("  1 status · 2 runs · 3 ao · 4 review · 5 help    r refresh    enter open    esc back    q quit"),
+		styleSoft.Render("  1 status · 2 runs · 3 orchestrate · 4 ao · 5 review · 6 help    r refresh    enter open/launch    esc back    q quit"),
 	)
 }
 
@@ -327,6 +401,9 @@ func (m *model) renderBody() string {
 	case m.tab == pageRuns:
 		title = fmt.Sprintf("runs · %d", len(m.runs))
 		content = m.renderRuns()
+	case m.tab == pageOrchestrate:
+		title = "orchestrate — give it something to do"
+		content = m.renderOrchestrate()
 	case m.tab == pageAO:
 		title = "agent orchestrator"
 		content = m.renderAO()
@@ -487,9 +564,9 @@ func renderHelp() string {
 		styleFg.Render("forge-tui") + styleSoft.Render(" — cockpit over the forge CLI JSON surface"),
 		"",
 		styleSoft.Render("keys"),
-		styleFg.Render("  1-5") + styleSoft.Render("      switch pages"),
+		styleFg.Render("  1-6") + styleSoft.Render("      switch pages"),
 		styleFg.Render("  j / k") + styleSoft.Render("    move (or scroll events)"),
-		styleFg.Render("  enter") + styleSoft.Render("    open run detail"),
+		styleFg.Render("  enter") + styleSoft.Render("    open run detail · launch a goal (page 3)"),
 		styleFg.Render("  esc") + styleSoft.Render("      back"),
 		styleFg.Render("  r") + styleSoft.Render("        refresh"),
 		styleFg.Render("  q") + styleSoft.Render("        quit"),

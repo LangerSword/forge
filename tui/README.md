@@ -35,3 +35,11 @@ Keys: `j`/`k` move or scroll · `enter` open run · `esc` back · `r` refresh ·
 bubbletea (runtime) · lipgloss (styling) · bubbles (spinner, viewport).
 Next increments: bubbles list/table, glamour-rendered plan viewer, and an
 in-TUI goal compiler once `forge plan` learns streaming.
+
+## orchestrate (page 3)
+
+Pick a goal file from `evals/goals/`, press enter, and the cockpit launches
+`forge run-graph <file>` — exactly the CLI a human would run — then streams
+the live run (node rows, event tail, final verdict) off the same
+`forge runs` / `forge run` JSON on a 2s ticker. `j/k` selects, `esc` returns
+to the picker after the verdict.
