@@ -22,6 +22,8 @@ logging.getLogger("neatlogs").setLevel(logging.WARNING)
 from . import __version__
 from .ao import AOClient
 from .ao_cli import AOCLI, AOCommandError, install_cli
+from .ao_daemon import daemon_status, require_ao_ready, start_daemon, stop_daemon
+from .ao_runner import AORunner
 from .c0_run import run_c0
 from .experiment import LearningExperiment, TaskExecutor
 from .fleet import FleetController, build_bounded_goal_graph
@@ -284,18 +286,36 @@ def cmd_review(run_id: str) -> int:
     return 0 if result["all_suites_100"] else 1
 
 
+def ao_runner_factory(run_root: Path):
+    """One construction point for the AO-backed runner every live command uses."""
+
+    def factory(request):
+        return AORunner(ao_cli=AOCLI(), ao_client=AOClient(), ledger=Ledger(run_root))
+
+    return factory
+
+
 def cmd_ao(args: argparse.Namespace) -> int:
-    """Agent Orchestrator CLI commands (lifecycle commands land in task 3/5)."""
-    if args.ao_command == "install-cli":
-        try:
+    """Agent Orchestrator CLI commands: install + headless daemon lifecycle."""
+    try:
+        if args.ao_command == "install-cli":
             result = install_cli(force=args.force)
-        except AOCommandError as exc:
-            print(json.dumps({"schema_version": "forge.ao.v1", "ok": False, "error": "install_failed", "message": str(exc)}, indent=2))
+        elif args.ao_command == "status":
+            result = daemon_status()
+            print(json.dumps({"schema_version": "forge.ao.v1", "ok": True, "daemon": result}, indent=2, sort_keys=True))
+            return 0
+        elif args.ao_command == "start":
+            result = start_daemon()
+        elif args.ao_command == "stop":
+            result = stop_daemon()
+        else:
+            print(json.dumps({"schema_version": "forge.ao.v1", "ok": False, "error": "unknown_ao_command"}, indent=2))
             return 1
-        print(json.dumps({"schema_version": "forge.ao.v1", "ok": True, **result}, indent=2, sort_keys=True))
-        return 0
-    print(json.dumps({"schema_version": "forge.ao.v1", "ok": False, "error": "unknown_ao_command"}, indent=2))
-    return 1
+    except AOCommandError as exc:
+        print(json.dumps({"schema_version": "forge.ao.v1", "ok": False, "error": f"{args.ao_command}_failed", "message": str(exc)[:800]}, indent=2))
+        return 1
+    print(json.dumps({"schema_version": "forge.ao.v1", "ok": True, **result}, indent=2, sort_keys=True))
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -332,6 +352,9 @@ def main(argv: list[str] | None = None) -> int:
     ao_sub = ao_cmd.add_subparsers(dest="ao_command", required=True)
     ao_install = ao_sub.add_parser("install-cli", help="extract the ao CLI from the Agent Orchestrator AppImage to ~/.local/bin/ao")
     ao_install.add_argument("--force", action="store_true")
+    ao_sub.add_parser("status", help="report daemon state via the ao CLI (works while the daemon is down)")
+    ao_sub.add_parser("start", help="start the AO daemon headless and wait until ready")
+    ao_sub.add_parser("stop", help="stop the AO daemon and verify the endpoint closes")
     dash = sub.add_parser("dashboard")
     dash.add_argument("--port", type=int, default=8787)
     args = parser.parse_args(argv)
@@ -348,11 +371,11 @@ def main(argv: list[str] | None = None) -> int:
             if args.command == "plan":
                 print(json.dumps({"schema_version": "forge.task-graph.v1", "ok": True, "goal": goal.model_dump(), "graph": graph.model_dump()}, indent=2, sort_keys=True))
                 return 0
+            if not args.dry_run:
+                require_ao_ready()
             controller = FleetController(
                 root(),
-                runner_factory=lambda request: __import__("forge.ao_runner", fromlist=["AORunner"]).AORunner(
-                    ao_cli=AOCLI(), ao_client=AOClient(), ledger=Ledger(root())
-                ),
+                runner_factory=ao_runner_factory(root()),
             )
             report = controller.run(goal, graph, dry_run=args.dry_run)
             print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
