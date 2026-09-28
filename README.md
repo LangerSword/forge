@@ -1,57 +1,52 @@
 # Forge — a commander agent with verified, cumulative learning
 
-**Syndicate by Maximor · Track 1: Automated Agent Engineering**
+**v0.2.9** · every claim in this repo is marked *observed* or *target* — the
+journal is the receipt trail: [docs/project-journal.md](docs/project-journal.md)
 
 Forge compiles a goal into a **typed execution graph**, runs it as a bounded
-fleet of specialist agents, carries context between handoffs through a shared
-**memory fabric instead of raw transcripts**, and promotes only capabilities
-that **measurably improve independently verified outcomes**.
+fleet of specialist agents on [Agent Orchestrator](https://aoagents.dev)
+workers, carries context between handoffs through a shared **memory fabric
+instead of raw transcripts**, and promotes only capabilities that
+**measurably improve independently verified outcomes**.
 
-Give it a goal, a repo, third-party tools, and a budget. Forge's target loop
-plans, executes through [Agent Orchestrator](https://aoagents.dev) workers,
-verifies the output, and **learns what it just proved**. Only lessons that
-survive an A/B gate become portable skills; a fresh worker on a *different
-harness* is intended to get the skill, not the conversation — and the
-improvement is measured, not claimed.
+Give it a goal, a repo, and a budget. Forge plans, executes bounded workers in
+isolated worktrees, verifies every node with deterministic checks, and
+**learns what it just proved** — only lessons that survive an A/B gate become
+portable skills, and the improvement is measured, not claimed.
 
-The current checkout implements the graph and memory layers on top of the
-bounded controller runtime: typed `NodeSpec`/`GraphSpec` compilation
-(`forge graph`), the `MemoryAdapter` context-fabric protocol with a
-deterministic local stub, memory recall/write wiring in the fleet controller,
-plus the earlier controller (GoalSpec validation, dependency-aware scheduling,
-fenced task context, verifier authority, task checkpoints, deadlines).
+**Start here → [docs/QUICKSTART.md](docs/QUICKSTART.md)** — install the CLI,
+bring up the AO daemon, open the cockpit.
 
-Scaffolding for what comes next is written for any model to execute:
-`docs/BUILD.md` is a step-by-step plan (recursive scheduler, judge routing,
-live Supermemory adapter) with exact tests, expected outputs, and failure
-modes.
+## Give it something to do
 
-The current checkout verifies the local learning path, the graph/memory
-refactor, and the controller's hard runtime safeguards. A real AO/OpenCode
-session was spawned, recovered, and cleaned up, but the worker produced no
-requested artifact after one bounded nudge. AO artifact-producing completion
-and cross-harness transfer remain open proof points; no autonomous success
-claim is made.
+```bash
+forge run-graph evals/goals/quickstart-doc-v1.md    # any .md plan or .json goal
+```
+
+One command, the whole loop: goal → compiled typed graph (specialist behind a
+verifier gate) → live AO workers in isolated worktrees → per-node
+deterministic verification → ledger. The graph passes only if every node
+passes, and every event is replayable with `forge run <run_id>`.
+
+**Verified live (2026-09-28):** `graph-7fd57cd4` — sessions `forge-19` /
+`forge-20`, each wrote `docs/QUICKSTART.md` in its own worktree and passed
+all four deterministic checks; 2m04s end-to-end. That file is in this repo
+now, promoted from a worker's worktree after review.
 
 ## Status and evidence boundary
 
-- **AO autonomous execution — verified (live, bounded, 2026-09-15):** the
-  full path is observed end-to-end: live daemon ready (`:3001`), Forge
-  resolving the daemon binary, spawn → worktree discovery → bounded worker
-  work → fresh artifact → independent content verification → verdict `passed`
-  → session cleanup. Run `ao-live-smoke-20260915-v2` (session `forge-14`,
-  opencode, ~11.5s spawn-to-verified, sha256 `1b37e8cb…`, exact payload and
-  completion signal in `.forge/ao-surface.json` `forge_daemon`). A first
-  attempt (`forge-13`) also produced the identical fresh artifact; its
-  one-off verifier had a swallowed `TypeError`, caught and fixed before the
-  clean pass. **2026-09-28 — wiring rebuilt and re-verified live:**
-  `forge ao install-cli|status|start|stop` own the lifecycle (stable CLI at
+- **Orchestrated live execution — verified (2026-09-28):** `forge run-graph`
+  compiles a goal (JSON or a markdown plan) into its typed graph and executes
+  it through the recursive scheduler with live AO workers. Every task runs
+  behind its own deterministic verifier (`goal.verifier_commands`); a run
+  passes only when every node passes. Markdown plans carry verification: a
+  `## Verification` section maps one command per bullet. Live proof:
+  `graph-7fd57cd4` (sessions `forge-19` / `forge-20`; 281-test suite green).
+- **AO lifecycle — Forge-managed, verified (2026-09-28):** `forge ao
+  install-cli|status|start|stop` own the daemon lifecycle (stable CLI at
   `~/.local/bin/ao`; headless `ao daemon`, readyz-polled; stop verifies the
-  endpoint closes). Repeatable proof: `scripts/ao_live_smoke.py` → session
-  `forge-15`, `docs/SMOKE.md` sha256 `3bf5f1f1…`, 6 polls, ~26.7s, `passed`;
-  live fleet runs preflight the daemon with an actionable error. This proves
-  one bounded autonomous completion, not a fleet or cross-harness claim —
-  those remain open.
+  endpoint closes). Repeatable bounded proof: `scripts/ao_live_smoke.py` →
+  session `forge-15`, `docs/SMOKE.md` sha256 `3bf5f1f1…`, `passed`.
 - **Cross-harness transfer — retired as a measured claim (0.2.4):** replaced
   by the unified harness policy: variance is pinned by construction (declared
   `HarnessPolicy`, enforced before spawn, `policy_hash` comparability in the
@@ -68,23 +63,23 @@ claim is made.
   worker or fleet trace coverage.
 - **Supermemory — protocol implemented; backend planned:** the context-fabric
   contract (`MemoryAdapter`: write / recall / profile) and a deterministic
-  `LocalMemoryStub` are implemented and wired into the fleet controller. A live
-  Supermemory backend is not yet configured or read back; until it is, the
-  local `.forge` registry, ledger, and stub remain authoritative.
+  `LocalMemoryStub` are implemented and wired into the fleet controller. A
+  live Supermemory backend is not yet configured or read back; until it is,
+  the local `.forge` registry, ledger, and stub remain authoritative.
 - **Deterministic review — verified scope:** `forge review`
   (`src/forge/review.py`) grades Forge's own verdict systems against
   independent, code-computed oracles — the promotion gate (1800-case boundary
-  sweep), the controller verifier-authority truth table, and the judge-routing
-  matrix — with per-case failure detail in the ledger. It exits nonzero unless
-  every dimension is 100%, is re-runnable, and detects a deliberately regressed
-  gate rather than re-grading it green. A fourth suite grades the harness
-  policy contract and its enforcement order (violations must raise before
-  spawn). This grades Forge's decision systems; it is not an LLM judge and
-  proves nothing about live AO completion.
+  sweep), the controller verifier-authority truth table, the judge-routing
+  matrix, and the harness-policy contract — with per-case failure detail in
+  the ledger. It exits nonzero unless every dimension is 100%, is re-runnable,
+  and detects a deliberately regressed gate rather than re-grading it green.
+  This grades Forge's decision systems; it is not an LLM judge.
+- **Not claimed:** fleet-scale results, cross-harness transfer, autonomous
+  deployment. Anything not proven above stays a roadmap item.
 
-The tracked C0 submission report records a failing baseline and a passing
-bounded repair, plus a `candidate` skill artifact; it explicitly does not claim
-cross-domain or cross-harness transfer.
+The tracked C0 learning report records a failing baseline and a passing
+bounded repair, plus a `candidate` skill artifact; it explicitly does not
+claim cross-domain or cross-harness transfer.
 
 ## The problem
 
@@ -101,13 +96,19 @@ first-class planes:
 
 - **Agent/controller** — owns GoalSpec intake, dependency scheduling, bounded
   fleet lifecycle, and terminal run reports
-- **Planner** — goal → task graph, with deterministic budget/harness guardrails
-- **Context builder** — fenced, task-scoped context packages: repo map, decisions, and
-  only *validated* skills (references, not copies)
-- **Executor** — AO worker adapter (worktrees, PR/CI stay AO's); the
-  current spawn/lifecycle contract is still unverified
-- **Verifier** — independent-model acceptance checks; the only component that
-  can mark a run passed
+- **Planner** — goal → task graph, with deterministic budget/harness
+  guardrails; the recursive scheduler expands `planner` nodes into subgraphs,
+  bounded by `max_depth`
+- **Context builder** — fenced, task-scoped context packages: repo map,
+  decisions, and only *validated* skills (references, not copies)
+- **Executor** — AO worker adapter: bounded spawn, worktree discovery,
+  watchdog (nudge/kill classifications), fresh-artifact enforcement — verified
+  live
+- **Verifier** — independent acceptance checks; the only component that can
+  mark a run passed. Deterministic command checks lead; the model grader never
+  overrides a deterministic failure
+- **Operator cockpit** — Go/bubbletea TUI (`tui/` → `forge-tui`) reading the
+  same CLI JSON surface; bare `forge` opens it
 - **Learning loop** — observe → diagnose → candidate skill → **gate**
   (applicability + A/B benefit + held-out no-regression) → publish or reject
 - **Economics** — per-run token/$/wall-time ledger; cost-per-verified-outcome
@@ -120,21 +121,21 @@ first-class planes:
 AO's current live catalog authorizes OpenCode only, and AO does not expose a
 Hermes worker adapter. Hermes is therefore Forge's sidecar reflection
 specialist: it analyzes bounded run evidence and proposes candidate skills or
-strategy notes. Forge—not Hermes—runs the promotion gate, so reflection is
+strategy notes. Forge — not Hermes — runs the promotion gate, so reflection is
 never mistaken for verified learning or autonomous execution.
 
 ## What improved across iterations
 
-*(populated by `evals/results/` — baseline C0 vs learning-enabled C2,
-cross-harness transfer run; raw run JSON in `evals/results/`)*
+*(populated by `evals/results/` — baseline C0 vs learning-enabled C2; raw run
+JSON in `evals/results/`)*
 
 | Condition | Acceptance pass | Tool calls | Wall time | Cost |
 |---|---|---|---|---|
 | C0 baseline (no learning) | — | — | — | — |
 | C2 + validated skills | — | — | — | — |
 
-The table stays unpopulated until comparable C0/C2 runs and the transfer
-condition have observed evidence. Do not replace the dashes with estimates.
+The table stays unpopulated until comparable C0/C2 runs have observed
+evidence. Do not replace the dashes with estimates.
 
 ## How to run
 
@@ -169,14 +170,14 @@ uv run forge run-graph evals/goals/quickstart-doc-v1.md    # or any .md plan / .
 
 ## Product surfaces and deployment
 
-Forge is packaged as a project-local Python CLI, a local web dashboard, and
-a Go/bubbletea cockpit (`tui/` → `forge-tui`, reading the same JSON surface);
-it is not a second Kanban competing with AO. The target topology has AO
-supervise workers and worktrees, while Forge owns the ledger, learning gate,
-evidence, and deployment policy. In the current checkout, Forge owns the AO lifecycle
-(`forge ao install-cli|start|stop`) and bounded autonomous spawn is verified
-end-to-end (2026-09-15, wiring re-verified 2026-09-28). A future TUI will call the same API rather than introduce another
-state model.
+Forge is packaged as a project-local Python CLI, a local web dashboard, and a
+Go/bubbletea cockpit (`tui/` → `forge-tui`, reading the same CLI JSON
+surface — not a second state model); it is not a second Kanban competing with
+AO. The target topology has AO supervise workers and worktrees, while Forge
+owns the ledger, learning gate, evidence, and deployment policy. In the
+current checkout, Forge owns the AO lifecycle
+(`forge ao install-cli|start|stop`), and bounded autonomous spawn plus
+orchestrated graph runs are verified end-to-end (2026-09-15 / 2026-09-28).
 
 For generated web apps, the delivery path is explicit:
 
@@ -184,24 +185,18 @@ For generated web apps, the delivery path is explicit:
 build → verify → preview → human approval → deploy → smoke test → URL
 ```
 
-The Forge product site is packaged as `@llangersword/forge@3.1.1` and is deployed
-to Vercel at [web-rust-three-63.vercel.app](https://web-rust-three-63.vercel.app/).
-It is a static product/docs/support site, not a live AO tracker or hosted Forge
-backend. The public npm package installs the `forge` executable:
+The product site is deployed to Vercel at
+[web-rust-three-63.vercel.app](https://web-rust-three-63.vercel.app/) — a
+static product/docs site, not a live AO tracker or hosted Forge backend. The
+npm install path (`@llangersword/forge`) is **pending its first publish**;
+until it lands on npmjs.com, install from source — see
+[docs/QUICKSTART.md](docs/QUICKSTART.md). The unscoped npmjs.com package
+`forge` is unrelated and is not modified. No generated app deploys
+automatically without an approval event.
 
-```bash
-npm install @llangersword/forge
-npx forge --port 4173
-```
-
-The first publish is a one-time maintainer action. Once the package exists on
-npmjs.com, anyone can install it without logging in. Future releases run from
-`.github/workflows/publish-npm.yml` using npm Trusted Publishing and GitHub OIDC.
-The unscoped npmjs.com package `forge` is unrelated and is not modified.
-No generated app deploys automatically without an approval event.
-
-Full runbook: `SPEC.md` §10 and §15. AO must be running (`forge ao start`; raw `ao status`); Forge drives
-it over the loopback API recorded in `.forge/ao-surface.json`.
+Full runbook: `SPEC.md` §10 and §15. AO must be running (`forge ao start`;
+raw `ao status`); Forge drives it over the loopback API recorded in
+`.forge/ao-surface.json`.
 
 ## Evidence and project memory
 
@@ -211,40 +206,51 @@ Use [docs/journal-template.md](docs/journal-template.md) for narrative entries.
 Runtime events go to `.forge/ledger/journal.jsonl` through
 `forge.journal.ProjectJournal`; entries require evidence and redact
 secret-like fields. This journal is part of the product evidence: it helps
-debug rough edges and gives the demo a truthful story of how the fleet learned
-from failures.
+debug rough edges and gives the project a truthful story of how the fleet
+learned from failures.
 
 ## Roadmap
 
-1. **Autonomous AO execution — verified (2026-09-15; wiring re-verified
-   2026-09-28):** bounded spawn with the exact payload and completion signal
-   recorded in `.forge/ao-surface.json`; independently verified artifacts;
-   repeatable via `scripts/ao_live_smoke.py`.
-2. **Prove transfer:** authorize a second AO harness, give it the same bounded
+1. **Decision-engine slot:** a `DecisionEngine` protocol with a local
+   [Kev](https://github.com/jaredpalmer/kev)-class backend first (drop-in
+   `/v1/systemone` contract; one env var swaps to a hosted endpoint) — this is
+   where judge routing stops being a stub.
+2. **Runner-side approval handling:** when a headless worker raises a
+   permission request, resolve it from the runner (deny outside-worktree by
+   default) instead of letting the session stall; the daemon's resolve
+   endpoint is known.
+3. **Model-variant A/B, for real:** the prepared
+   `evals/goals/model-ab-trial-v1.json` gate has not been run live yet — run
+   it and record it.
+4. **Prove transfer:** authorize a second AO harness, give it the same bounded
    task/context contract with a validated skill, and report the fresh-worker
    result separately from the OpenCode run.
-3. **Keep reflection gated:** Hermes remains a sidecar proposal source; only
-   Forge's applicability, A/B, and held-out checks can promote a skill.
-4. **Add Supermemory later:** implement and read back an external mirror only
+5. **Add Supermemory later:** implement and read back an external mirror only
    after the local registry/ledger path is stable.
 
 ## How AO was used
 
-AO is Forge's execution layer, now Forge-managed: `forge ao install-cli`
-installs a stable CLI from the Agent Orchestrator AppImage, and
+AO is Forge's execution layer, Forge-managed end-to-end: `forge ao install-cli`
+extracts a stable CLI from the Agent Orchestrator AppImage, and
 `forge ao start|status|stop` drive the headless daemon (verified live
-2026-09-28). OpenCode is the only observed authorized harness. Autonomous
-bounded completion is verified (sessions `forge-14`/`forge-15`, fresh
-independently verified artifacts); a fleet or cross-harness claim is still
-not made.
+2026-09-28). OpenCode is the only observed authorized harness. Live runs span
+the first bounded completion (`forge-14` / `forge-15`) through orchestrated
+graph runs (`forge-19` / `forge-20`, `graph-7fd57cd4`). Workers run in
+isolated git worktrees cut from `origin/main`; the `forge` project runs with
+`permissions=bypass-permissions` because unbounded interactive approval stalls
+headless sessions — root-caused in the journal.
 
 ## Stack
 
-Python 3.11 · uv · SQLite ledger · AO daemon (Forge-managed lifecycle: `forge ao ...`; verified 2026-09-28) · TensorMux inference (`glm-4-7-flash` for workers) ·
-Supermemory (future integration) · Neatlogs (verified OpenAI smoke/diagnostic
-trace path)
+Python 3.11 · uv (editable uv-tool install) · SQLite ledger · AO daemon
+(Forge-managed lifecycle) · Go/bubbletea cockpit · TensorMux inference
+(`glm-4-7-flash` for workers) · Supermemory (future integration) · Neatlogs
+(verified OpenAI smoke/diagnostic trace path)
 
 **Docs:** [SPEC.md](SPEC.md) (source of truth, incl. AI working rules §14) ·
-[architecture.md](architecture.md) · [docs/yc-positioning.md](docs/yc-positioning.md) ·
-[docs/hermes-analysis.md](docs/hermes-analysis.md) · [docs/agent-charters.md](docs/agent-charters.md) ·
-[docs/autoresearch-harness-evals.md](docs/autoresearch-harness-evals.md)
+[docs/QUICKSTART.md](docs/QUICKSTART.md) ·
+[docs/project-journal.md](docs/project-journal.md) ·
+[docs/BUILD.md](docs/BUILD.md) · [architecture.md](architecture.md) ·
+[docs/agent-charters.md](docs/agent-charters.md) ·
+[docs/yc-positioning.md](docs/yc-positioning.md) ·
+[docs/hermes-analysis.md](docs/hermes-analysis.md)

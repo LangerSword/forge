@@ -1,8 +1,8 @@
 # Forge — Spec Sheet
 
 **Version:** 0.2.9 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-28
-**Track:** Syndicate by Maximor — Track 1: Automated Agent Engineering
-**Deadline:** 2026-09-07 03:30 IST (Devpost)
+**Scope:** commander agent with verified, cumulative learning — every claim in
+this file is marked observed or target; see §Status for the current boundary.
 **Working dir:** `~/forge` · **Remote:** `https://github.com/LangerSword/forge`
 
 > **This file is the single source of truth.** Any AI or human working on this
