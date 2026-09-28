@@ -743,6 +743,14 @@ evidence they regressed. What is genuinely still open, in priority order:
   no-op era was partly Forge-side: `resolve_binary()` gated daemon discovery
   on a hardcoded AppImage path (fixed, commit `c0d53ec`). Proves one bounded
   autonomous completion; multi-worker fleet runs remain unproven.
+- **AO lifecycle wiring — RESOLVED (2026-09-28).** `forge ao
+  install-cli|status|start|stop`: stable CLI at `~/.local/bin/ao` extracted
+  from the AppImage (sha256 `d5961fd1…`, app 0.12.11); the daemon runs
+  headless via the hidden `ao daemon` command, readyz-polled and detached;
+  stop verifies the endpoint closes; live `forge fleet` preflights with an
+  actionable error. Live smoke re-verified through the real runner (session
+  `forge-15`, `docs/SMOKE.md` sha256 `3bf5f1f1…`, `passed`, ~26.7s,
+  repeatable via `scripts/ao_live_smoke.py`).
 - **Second harness / cross-harness transfer — RETIRED as a measured claim
   (0.2.4).** Replaced by the unified harness policy: variance pinned by
   construction (declared `HarnessPolicy`, enforced before spawn,

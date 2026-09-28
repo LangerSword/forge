@@ -1,6 +1,6 @@
 # Forge — Spec Sheet
 
-**Version:** 0.2.5 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-15
+**Version:** 0.2.6 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-28
 **Track:** Syndicate by Maximor — Track 1: Automated Agent Engineering
 **Deadline:** 2026-09-07 03:30 IST (Devpost)
 **Working dir:** `~/forge` · **Remote:** `https://github.com/LangerSword/forge`
@@ -646,3 +646,12 @@ unattended production deployment.
   run records `model_condition` with `policy_hash 6630d9005689faf5`;
   nonallowlisted model exits 1 `policy_violation` before any trial). 236
   tests pass (9 new).
+- **0.2.6** (2026-09-28): AO becomes a Forge-managed dependency — the stable
+  `ao` CLI is installed from the Agent Orchestrator AppImage
+  (`forge ao install-cli`, sha256 `d5961fd1…`) and the daemon lifecycle is
+  owned headlessly (`forge ao status|start|stop`, readyz-polled; stop
+  verifies the endpoint closes). Resolution never gates on a hardcoded
+  AppImage path again (env → pin → live `/proc` → stable copy → actionable
+  error). Live fleet runs preflight the daemon; the bounded live smoke is
+  repeatable (`scripts/ao_live_smoke.py`; session `forge-15`, sha256
+  `3bf5f1f1…`). 258 tests pass (22 new).

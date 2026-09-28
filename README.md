@@ -44,8 +44,14 @@ claim is made.
   completion signal in `.forge/ao-surface.json` `forge_daemon`). A first
   attempt (`forge-13`) also produced the identical fresh artifact; its
   one-off verifier had a swallowed `TypeError`, caught and fixed before the
-  clean pass. This proves one bounded autonomous completion, not a fleet or
-  cross-harness claim — those remain open.
+  clean pass. **2026-09-28 — wiring rebuilt and re-verified live:**
+  `forge ao install-cli|status|start|stop` own the lifecycle (stable CLI at
+  `~/.local/bin/ao`; headless `ao daemon`, readyz-polled; stop verifies the
+  endpoint closes). Repeatable proof: `scripts/ao_live_smoke.py` → session
+  `forge-15`, `docs/SMOKE.md` sha256 `3bf5f1f1…`, 6 polls, ~26.7s, `passed`;
+  live fleet runs preflight the daemon with an actionable error. This proves
+  one bounded autonomous completion, not a fleet or cross-harness claim —
+  those remain open.
 - **Cross-harness transfer — retired as a measured claim (0.2.4):** replaced
   by the unified harness policy: variance is pinned by construction (declared
   `HarnessPolicy`, enforced before spawn, `policy_hash` comparability in the
@@ -137,17 +143,21 @@ condition have observed evidence. Do not replace the dashes with estimates.
 cp .env.example .env      # add credentials only for an enabled path
 uv sync
 
-# 2. one run
+# 2. AO lifecycle (once): stable CLI + headless daemon before any live run
+uv run forge ao install-cli   # extracts ao to ~/.local/bin/ao (AppImage required)
+uv run forge ao start         # readyz-polled; `forge ao status` / `forge ao stop` companion
+
+# 3. one run
 python -m forge.cli run evals/goals/<goal>.json --condition C0
 
-# 3. grade Forge's own verdict systems (deterministic oracles, no LLM judge)
+# 4. grade Forge's own verdict systems (deterministic oracles, no LLM judge)
 python -m forge.cli review
 
 # The unified harness policy (declared in .forge/harness-policy.json) is
 # enforced before every spawn: harness pinned to opencode, explicit model
 # allowlist, chat-only sessions, bounded polls/runtime.
 
-# 4. dashboard
+# 5. dashboard
 python -m forge.cli dashboard
 ```
 
@@ -156,9 +166,9 @@ python -m forge.cli dashboard
 Forge is packaged as a project-local Python CLI plus a local web dashboard;
 it is not a second Kanban competing with AO. The target topology has AO
 supervise workers and worktrees, while Forge owns the ledger, learning gate,
-evidence, and deployment policy. In the current checkout, AO readiness is
-observed but autonomous Forge spawn and lifecycle completion are not yet
-verified. A future TUI will call the same API rather than introduce another
+evidence, and deployment policy. In the current checkout, Forge owns the AO lifecycle
+(`forge ao install-cli|start|stop`) and bounded autonomous spawn is verified
+end-to-end (2026-09-15, wiring re-verified 2026-09-28). A future TUI will call the same API rather than introduce another
 state model.
 
 For generated web apps, the delivery path is explicit:
@@ -183,7 +193,7 @@ npmjs.com, anyone can install it without logging in. Future releases run from
 The unscoped npmjs.com package `forge` is unrelated and is not modified.
 No generated app deploys automatically without an approval event.
 
-Full runbook: `SPEC.md` §10 and §15. AO must be running (`ao status`); Forge drives
+Full runbook: `SPEC.md` §10 and §15. AO must be running (`forge ao start`; raw `ao status`); Forge drives
 it over the loopback API recorded in `.forge/ao-surface.json`.
 
 ## Evidence and project memory
@@ -199,9 +209,10 @@ from failures.
 
 ## Roadmap
 
-1. **Verify autonomous AO execution:** exercise an explicitly approved tiny
-   spawn, record the exact payload and completion signal in
-   `.forge/ao-surface.json`, and accept only an independently verified artifact.
+1. **Autonomous AO execution — verified (2026-09-15; wiring re-verified
+   2026-09-28):** bounded spawn with the exact payload and completion signal
+   recorded in `.forge/ao-surface.json`; independently verified artifacts;
+   repeatable via `scripts/ao_live_smoke.py`.
 2. **Prove transfer:** authorize a second AO harness, give it the same bounded
    task/context contract with a validated skill, and report the fresh-worker
    result separately from the OpenCode run.
@@ -212,16 +223,17 @@ from failures.
 
 ## How AO was used
 
-AO was used during the build for readiness checks and isolated worker attempts.
-OpenCode was the only observed authorized harness. Some bootstrap work was
-independently observed, while other attempts were no-ops or controller-assisted;
-the Forge autonomous spawn/lifecycle contract therefore remains unverified.
-This section is not a claim of end-to-end autonomous execution.
+AO is Forge's execution layer, now Forge-managed: `forge ao install-cli`
+installs a stable CLI from the Agent Orchestrator AppImage, and
+`forge ao start|status|stop` drive the headless daemon (verified live
+2026-09-28). OpenCode is the only observed authorized harness. Autonomous
+bounded completion is verified (sessions `forge-14`/`forge-15`, fresh
+independently verified artifacts); a fleet or cross-harness claim is still
+not made.
 
 ## Stack
 
-Python 3.11 · uv · SQLite ledger · AO daemon (target execution layer; spawn/
-lifecycle unverified) · TensorMux inference (`glm-4-7-flash` for workers) ·
+Python 3.11 · uv · SQLite ledger · AO daemon (Forge-managed lifecycle: `forge ao ...`; verified 2026-09-28) · TensorMux inference (`glm-4-7-flash` for workers) ·
 Supermemory (future integration) · Neatlogs (verified OpenAI smoke/diagnostic
 trace path)
 

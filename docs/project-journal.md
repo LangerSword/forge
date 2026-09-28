@@ -868,3 +868,62 @@ Running the A/B for real: a live skill-vs-no-skill comparison through
 `ModelABExecutor` (bounded AO spawns, both conditions), then the gate
 measures the improvement. Supermemory live service, planner
 checkpointing, `forge run-graph`, publish-npm fix.
+
+## 2026-09-28 — AO wiring rebuilt: lifecycle owned by Forge, live smoke re-verified (0.2.6)
+
+- **Type:** milestone / integration hardening
+- **Status:** observed (258 tests; live headless daemon lifecycle; live bounded smoke)
+- **Agents/harnesses:** Forge core, pytest, AO daemon (headless), opencode worker
+- **Scope:** `ao_cli.py` (resolution + install), new `ao_daemon.py`, `cli.py`
+  (`forge ao ...`), `scripts/ao_live_smoke.py`,
+  `evals/results/live-smoke-2026-09-28.json`
+
+### What was broken (three real breaks, found live on 2026-09-28)
+
+1. `resolve_binary()` fell back to `~/.local/bin/agent-orchestrator-linux-x64.AppImage`
+   — a path that does not exist (AppImageLauncher moved the app to
+   `~/Applications`, hash-suffixed). Daemon down ⇒ every live path failed at
+   resolution; a running daemon had masked it via the `/proc` scan.
+2. No stable `ao` CLI existed on the machine: it lives only inside the
+   running AppImage mount, and `ao doctor` warned it was missing from PATH.
+3. Nothing owned the daemon lifecycle; the desktop app was assumed running.
+   No headless start was documented — except the hidden `ao daemon` command
+   (found by probing the extracted binary; the top-level help does not list
+   it), which runs the same backend standalone.
+
+### What was built (tasks 1–5, test-first, each commit gated on green)
+
+- Resolution chain: env → explicit pin → live daemon via `/proc`
+  (version-matched to the running daemon) → stable copy → actionable error.
+- `forge ao install-cli`: extracts `resources/daemon/ao` from the AppImage to
+  `~/.local/bin/ao` (sha256 `d5961fd1…`, app 0.12.11); idempotent, `--force`
+  re-extracts; `ao` is now on PATH for workspace hooks.
+- `forge ao status|start|stop`: headless daemon lifecycle. Start is detached
+  and readyz-polled (log `~/.ao/forge-daemon.log`); stop verifies the
+  endpoint actually closes; status works while the daemon is down.
+- One `ao_runner_factory` for fleet/experiment wiring (the inline
+  `__import__` hack is gone); live `forge fleet` preflights the daemon with
+  an actionable error (`--dry-run` unaffected).
+- `scripts/ao_live_smoke.py`: the repeatable bounded live proof.
+
+### Evidence
+
+```text
+uv run pytest -q → 258 passed (22 new across the five tasks)
+forge fleet <goal> (daemon down)  → ok:false, "start it with `forge ao start`" (exit 1)
+forge ao start                    → started; daemon ready, :3001, pid 1045959
+forge ao status                   → ready (down: stopped)
+forge harnesses                   → live catalog (opencode authorized/installed)
+uv run python scripts/ao_live_smoke.py → passed; session forge-15;
+  docs/SMOKE.md sha256 3bf5f1f1…, content "SMOKE 2026-09-28"; 6 polls,
+  ~26.7s spawn-to-verified; cleanup kill verified_artifact
+```
+
+### What stays open
+
+The model-variant A/B for real (a live skill-vs-no-skill comparison through
+`ModelABExecutor` — built, not yet wired into the CLI experiment path),
+`forge run-graph`, the Supermemory live service, and the publish-npm fix
+before pushing. The desktop entry `Exec=` still points at the stale
+`~/.local/bin/agent-orchestrator-linux-x64.AppImage` (launching AO from the
+app menu may fail; the daemon now starts via `forge ao start`).

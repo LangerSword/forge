@@ -1,0 +1,300 @@
+{
+  "schema_version": "forge.ao-runner.v1",
+  "run_id": "ao-live-smoke-20260928",
+  "status": "passed",
+  "passed": true,
+  "classification": "passed",
+  "session_id": "forge-15",
+  "worktree": "/home/lakshaya/.ao/data/worktrees/forge/forge-15",
+  "artifact_exists": true,
+  "verification_passed": true,
+  "reason": "artifact and independent verification passed",
+  "events": [
+    {
+      "kind": "spawn",
+      "payload": {
+        "command": [
+          "/home/lakshaya/.local/bin/ao",
+          "spawn",
+          "--project",
+          "forge",
+          "--kind",
+          "worker",
+          "--harness",
+          "opencode",
+          "--mode",
+          "chat",
+          "--name",
+          "smoke-verify",
+          "--prompt",
+          "<redacted>"
+        ],
+        "decision": "execute"
+      }
+    },
+    {
+      "kind": "spawn_result",
+      "payload": {
+        "exit_code": 0,
+        "session_id": "forge-15",
+        "worktree": null
+      }
+    },
+    {
+      "kind": "worktree_discovered",
+      "payload": {
+        "session_id": "forge-15",
+        "worktree": "/home/lakshaya/.ao/data/worktrees/forge/forge-15"
+      }
+    },
+    {
+      "kind": "artifact_baseline",
+      "payload": {
+        "artifact": "/home/lakshaya/.ao/data/worktrees/forge/forge-15/docs/SMOKE.md",
+        "fingerprint": null
+      }
+    },
+    {
+      "kind": "check",
+      "payload": {
+        "poll": 1,
+        "artifact": "/home/lakshaya/.ao/data/worktrees/forge/forge-15/docs/SMOKE.md",
+        "artifact_exists": false,
+        "artifact_fresh": false,
+        "artifact_fingerprint": null,
+        "baseline_fingerprint": null,
+        "verification_passed": false,
+        "verification_error": null
+      }
+    },
+    {
+      "kind": "poll",
+      "payload": {
+        "poll": 1,
+        "session_id": "forge-15",
+        "status": "working",
+        "activity_state": "active",
+        "elapsed_s": 16.62101,
+        "last_activity_s": 0.020018,
+        "changed_files": [],
+        "artifact_exists": false,
+        "verification_passed": false
+      }
+    },
+    {
+      "kind": "watchdog",
+      "payload": {
+        "poll": 1,
+        "classification": "working",
+        "should_nudge": false,
+        "should_kill": false,
+        "reason": "worker active within artifact checkpoint"
+      }
+    },
+    {
+      "kind": "check",
+      "payload": {
+        "poll": 2,
+        "artifact": "/home/lakshaya/.ao/data/worktrees/forge/forge-15/docs/SMOKE.md",
+        "artifact_exists": false,
+        "artifact_fresh": false,
+        "artifact_fingerprint": null,
+        "baseline_fingerprint": null,
+        "verification_passed": false,
+        "verification_error": null
+      }
+    },
+    {
+      "kind": "poll",
+      "payload": {
+        "poll": 2,
+        "session_id": "forge-15",
+        "status": "working",
+        "activity_state": "active",
+        "elapsed_s": 18.64523,
+        "last_activity_s": 2.044238,
+        "changed_files": [],
+        "artifact_exists": false,
+        "verification_passed": false
+      }
+    },
+    {
+      "kind": "watchdog",
+      "payload": {
+        "poll": 2,
+        "classification": "working",
+        "should_nudge": false,
+        "should_kill": false,
+        "reason": "worker active within artifact checkpoint"
+      }
+    },
+    {
+      "kind": "check",
+      "payload": {
+        "poll": 3,
+        "artifact": "/home/lakshaya/.ao/data/worktrees/forge/forge-15/docs/SMOKE.md",
+        "artifact_exists": false,
+        "artifact_fresh": false,
+        "artifact_fingerprint": null,
+        "baseline_fingerprint": null,
+        "verification_passed": false,
+        "verification_error": null
+      }
+    },
+    {
+      "kind": "poll",
+      "payload": {
+        "poll": 3,
+        "session_id": "forge-15",
+        "status": "working",
+        "activity_state": "active",
+        "elapsed_s": 20.66871,
+        "last_activity_s": 4.067718,
+        "changed_files": [],
+        "artifact_exists": false,
+        "verification_passed": false
+      }
+    },
+    {
+      "kind": "watchdog",
+      "payload": {
+        "poll": 3,
+        "classification": "working",
+        "should_nudge": false,
+        "should_kill": false,
+        "reason": "worker active within artifact checkpoint"
+      }
+    },
+    {
+      "kind": "check",
+      "payload": {
+        "poll": 4,
+        "artifact": "/home/lakshaya/.ao/data/worktrees/forge/forge-15/docs/SMOKE.md",
+        "artifact_exists": false,
+        "artifact_fresh": false,
+        "artifact_fingerprint": null,
+        "baseline_fingerprint": null,
+        "verification_passed": false,
+        "verification_error": null
+      }
+    },
+    {
+      "kind": "poll",
+      "payload": {
+        "poll": 4,
+        "session_id": "forge-15",
+        "status": "working",
+        "activity_state": "active",
+        "elapsed_s": 22.69331,
+        "last_activity_s": 6.092318,
+        "changed_files": [],
+        "artifact_exists": false,
+        "verification_passed": false
+      }
+    },
+    {
+      "kind": "watchdog",
+      "payload": {
+        "poll": 4,
+        "classification": "working",
+        "should_nudge": false,
+        "should_kill": false,
+        "reason": "worker active within artifact checkpoint"
+      }
+    },
+    {
+      "kind": "check",
+      "payload": {
+        "poll": 5,
+        "artifact": "/home/lakshaya/.ao/data/worktrees/forge/forge-15/docs/SMOKE.md",
+        "artifact_exists": false,
+        "artifact_fresh": false,
+        "artifact_fingerprint": null,
+        "baseline_fingerprint": null,
+        "verification_passed": false,
+        "verification_error": null
+      }
+    },
+    {
+      "kind": "poll",
+      "payload": {
+        "poll": 5,
+        "session_id": "forge-15",
+        "status": "working",
+        "activity_state": "active",
+        "elapsed_s": 24.712918,
+        "last_activity_s": 8.111926,
+        "changed_files": [],
+        "artifact_exists": false,
+        "verification_passed": false
+      }
+    },
+    {
+      "kind": "watchdog",
+      "payload": {
+        "poll": 5,
+        "classification": "working",
+        "should_nudge": false,
+        "should_kill": false,
+        "reason": "worker active within artifact checkpoint"
+      }
+    },
+    {
+      "kind": "check",
+      "payload": {
+        "poll": 6,
+        "artifact": "/home/lakshaya/.ao/data/worktrees/forge/forge-15/docs/SMOKE.md",
+        "artifact_exists": true,
+        "artifact_fresh": true,
+        "artifact_fingerprint": "3bf5f1f136711d6c672caf890cf555164fac20fc9ec14914a5d366755aa2455a",
+        "baseline_fingerprint": null,
+        "verification_passed": true,
+        "verification_error": null
+      }
+    },
+    {
+      "kind": "poll",
+      "payload": {
+        "poll": 6,
+        "session_id": "forge-15",
+        "status": "working",
+        "activity_state": "active",
+        "elapsed_s": 26.733037,
+        "last_activity_s": 10.132045,
+        "changed_files": [
+          "docs/SMOKE.md"
+        ],
+        "artifact_exists": true,
+        "verification_passed": true
+      }
+    },
+    {
+      "kind": "watchdog",
+      "payload": {
+        "poll": 6,
+        "classification": "passed",
+        "should_nudge": false,
+        "should_kill": false,
+        "reason": "artifact and independent verification passed"
+      }
+    },
+    {
+      "kind": "cleanup",
+      "payload": {
+        "session_id": "forge-15",
+        "action": "kill",
+        "reason": "verified_artifact"
+      }
+    },
+    {
+      "kind": "verdict",
+      "payload": {
+        "status": "passed",
+        "classification": "passed",
+        "artifact_exists": true,
+        "verification_passed": true,
+        "reason": "artifact and independent verification passed"
+      }
+    }
+  ]
+}
