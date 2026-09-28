@@ -160,8 +160,8 @@ python -m forge.cli review
 # 5. dashboard
 python -m forge.cli dashboard
 
-# 6. cockpit (Go TUI): build once, then `forge-tui` from anywhere
-cd tui && go build -o ~/.local/bin/forge-tui . && forge-tui
+# 6. cockpit (Go TUI): build once — then bare `forge` opens it
+cd tui && go build -o ~/.local/bin/forge-tui . && forge
 ```
 
 ## Product surfaces and deployment

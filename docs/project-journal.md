@@ -971,3 +971,15 @@ pty run -> rendered frame (status page, 27-agent catalog) + clean quit on q
 Model-variant A/B for real; `forge run-graph`; decision engine (Jev/Kev
 contract); TUI next increments (glamour plan viewer, list/table widgets,
 in-TUI plan compile). The cockpit's look is pending the user running it.
+
+## 2026-09-28 — bare `forge` opens the cockpit (0.2.8)
+
+- **Type:** UX / entry point
+- **Status:** observed (274 tests; live pty run)
+
+An empty invocation now hands the terminal to forge-tui via `os.execv` (no
+Python wrapper lingers; signal handling belongs entirely to the TUI).
+`forge tui` is the explicit form. Non-interactive contexts get a JSON
+`not_a_tty` error naming a subcommand; a missing `forge-tui` names the build
+command. Verified live: `cd ~ && forge` renders the status page and exits
+clean on `q`; non-tty bare `forge` returns the actionable JSON.

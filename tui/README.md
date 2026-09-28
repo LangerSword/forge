@@ -8,7 +8,8 @@ CLI exposes. No second state model: every panel is a `forge` command.
 ```bash
 cd tui
 go build -o ~/.local/bin/forge-tui .
-forge-tui                # interactive (ctrl-c/q to quit)
+forge                    # bare `forge` (or `forge tui`) execs into the cockpit
+forge-tui                # the same binary, invoked directly
 forge-tui --dump         # non-interactive snapshot (CI / verification)
 forge-tui --root=/path   # override repo root (default: $FORGE_ROOT or ~/forge)
 ```

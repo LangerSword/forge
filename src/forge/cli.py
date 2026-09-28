@@ -5,6 +5,7 @@ import contextlib
 import json
 import logging
 import os
+import shutil
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -319,11 +320,46 @@ def cmd_ao(args: argparse.Namespace) -> int:
     return 0
 
 
+def _is_interactive() -> bool:
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def launch_tui() -> int:
+    """Hand the terminal to forge-tui (bare `forge` / `forge tui`)."""
+    if not _is_interactive():
+        print(json.dumps({
+            "schema_version": "forge.tui.v1", "ok": False, "error": "not_a_tty",
+            "message": "bare `forge` launches the interactive cockpit; in non-interactive contexts use a subcommand (e.g. `forge status`)",
+        }, indent=2))
+        return 1
+    binary = shutil.which("forge-tui")
+    if binary is None:
+        print(json.dumps({
+            "schema_version": "forge.tui.v1", "ok": False, "error": "forge_tui_missing",
+            "message": "forge-tui not found on PATH; build it with `cd tui && go build -o ~/.local/bin/forge-tui .`",
+        }, indent=2))
+        return 1
+    try:
+        os.execv(binary, [binary])
+    except OSError as exc:
+        print(json.dumps({
+            "schema_version": "forge.tui.v1", "ok": False, "error": "exec_failed",
+            "message": str(exc),
+        }, indent=2))
+        return 1
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="forge")
+    argv_list = list(sys.argv[1:] if argv is None else argv)
+    if not argv_list:
+        return launch_tui()
+    parser = argparse.ArgumentParser(prog="forge", description="Forge commander — bare `forge` launches the forge-tui cockpit.")
+
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("status")
+    sub.add_parser("tui", help="launch the forge-tui cockpit (same as running bare `forge`)")
     sub.add_parser("harnesses", help="read-only AO harness readiness JSON")
     plan = sub.add_parser("plan", help="show the bounded task graph for a goal JSON")
     plan.add_argument("goal_file")
@@ -358,9 +394,11 @@ def main(argv: list[str] | None = None) -> int:
     ao_sub.add_parser("stop", help="stop the AO daemon and verify the endpoint closes")
     dash = sub.add_parser("dashboard")
     dash.add_argument("--port", type=int, default=8787)
-    args = parser.parse_args(argv)
+    args = parser.parse_args(argv_list)
     if args.command == "status":
         return cmd_status()
+    if args.command == "tui":
+        return launch_tui()
     if args.command == "harnesses":
         return cmd_harnesses()
     if args.command == "ao":

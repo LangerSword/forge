@@ -1,6 +1,6 @@
 # Forge — Spec Sheet
 
-**Version:** 0.2.7 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-28
+**Version:** 0.2.8 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-28
 **Track:** Syndicate by Maximor — Track 1: Automated Agent Engineering
 **Deadline:** 2026-09-07 03:30 IST (Devpost)
 **Working dir:** `~/forge` · **Remote:** `https://github.com/LangerSword/forge`
@@ -665,3 +665,7 @@ unattended production deployment.
   lipgloss + bubbles): status / runs+detail / ao / review cockpit over the
   same JSON surface, with `--dump` for non-interactive verification.
   269 Python tests pass (11 new); go build/vet/test clean.
+- **0.2.8** (2026-09-28): bare `forge` launches the cockpit. An empty
+  invocation (and the explicit `forge tui`) execs into forge-tui; a missing
+  binary or a non-tty context fails loud with the fix. 274 Python tests
+  pass (5 new).
