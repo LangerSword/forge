@@ -983,3 +983,41 @@ Python wrapper lingers; signal handling belongs entirely to the TUI).
 `not_a_tty` error naming a subcommand; a missing `forge-tui` names the build
 command. Verified live: `cd ~ && forge` renders the status page and exits
 clean on `q`; non-tty bare `forge` returns the actionable JSON.
+
+## 2026-09-28 — `forge run-graph` live: goal → typed graph → workers → verified (0.2.9)
+
+- **Type:** orchestration loop / live evidence
+- **Status:** observed (graph-7fd57cd4 passed; sessions forge-19/forge-20; 281 tests)
+
+`forge run-graph <goal.json | plan.md>` compiles the goal into its typed graph
+(`compile_goal_graph`) and executes it through the recursive `GraphScheduler`
+with live AO workers — every node runs behind its own deterministic
+verification (`goal.verifier_commands`), and the graph passes only when every
+node passes. Markdown plans can now carry verification: the first section whose
+heading contains "verification" maps one bullet per command (a backticked span
+wins over prose; ≤8 commands, ≤32 tokens each).
+
+**Live proof:** `graph-7fd57cd4` — specialist + verifier nodes → sessions
+forge-19 / forge-20; each wrote `docs/QUICKSTART.md` in its own worktree
+(253 / 176 words) and passed all four deterministic checks; 2m04s end-to-end.
+
+**Blockers found and fixed on the way:**
+
+1. AO worktrees branch from `origin/main`, and the entire 0.2.x stack was
+   unpushed — the first worker saw Sep-7 code, noticed the mismatch, and went
+   investigating outside its worktree. Fixed by pushing main (`2e0cc6c..0617ef8`).
+2. Headless opencode workers die on permission approvals: any command touching
+   a path outside the worktree (even read-only) raises an approval; the session
+   pauses (`needs_input`); ACP refuses the watchdog's nudge mid-turn ("turn in
+   flight"); the session ends `blocked_hidden`. Cost: forge-16, forge-18.
+3. Fix: project config `agentConfig.permissions = "bypass-permissions"` for
+   `forge`. Note `ao project set-config` REPLACES the whole config — the first
+   flag-only attempt dropped `defaultBranch` and the worker/orchestrator agent
+   overrides; restored via a single `--config-json`.
+
+**Follow-up:** the approval endpoint exists
+(`POST /api/v1/sessions/{sid}/conversation/approvals/{rid}/resolve`;
+allow_once / allow_always / reject). Runner-side handling — detect a pending
+approval on `needs_input` and resolve it (deny outside-worktree by default)
+instead of nudging into a wall — is the principled follow-up for environments
+that keep permission gates on.

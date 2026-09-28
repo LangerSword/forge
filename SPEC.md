@@ -1,6 +1,6 @@
 # Forge — Spec Sheet
 
-**Version:** 0.2.8 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-28
+**Version:** 0.2.9 · **Status:** active baseline; evidence-bounded · **Updated:** 2026-09-28
 **Track:** Syndicate by Maximor — Track 1: Automated Agent Engineering
 **Deadline:** 2026-09-07 03:30 IST (Devpost)
 **Working dir:** `~/forge` · **Remote:** `https://github.com/LangerSword/forge`
@@ -669,3 +669,10 @@ unattended production deployment.
   invocation (and the explicit `forge tui`) execs into forge-tui; a missing
   binary or a non-tty context fails loud with the fix. 274 Python tests
   pass (5 new).
+- **0.2.9** (2026-09-28): `forge run-graph` — compile a goal (JSON or `.md`
+  plan) into its typed graph and execute it live through the recursive
+  scheduler with AO workers; every node runs behind its own deterministic
+  verification and the graph passes only if all pass. Markdown plans carry
+  verification commands (§Verification bullets; a backticked span wins; ≤8
+  commands, ≤32 tokens each). Live: `graph-7fd57cd4` passed (specialist +
+  verifier sessions forge-19 / forge-20). 281 Python tests pass (7 new).

@@ -139,3 +139,29 @@ def test_cli_plan_missing_file_is_actionable(tmp_path, monkeypatch, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is False
     assert "not found" in payload["message"]
+
+
+def test_markdown_verification_section_maps_commands(tmp_path):
+    text = (
+        "# Task\n\nHarness: opencode\n\n## Goal\n\n- Do it.\n\n## Acceptance\n\n- Done.\n\n"
+        "## Verification\n\n- `test -s docs/X.md`\n"
+        "- `grep -q \"needle\" docs/X.md` — prose is ignored\n"
+        "- test -f docs/X.md\n"
+    )
+    spec = goal_spec_from_markdown(text, source="x.md", root=tmp_path)
+    assert spec.verifier_commands == [
+        ["test", "-s", "docs/X.md"],
+        ["grep", "-q", "needle", "docs/X.md"],
+        ["test", "-f", "docs/X.md"],
+    ]
+
+
+def test_markdown_verification_too_many_commands_fails_loud(tmp_path):
+    commands = "\n".join(f"- `test -f f{i}.md`" for i in range(9))
+    text = (
+        f"# Task\n\nHarness: opencode\n\n## Goal\n\n- Do it.\n\n## Acceptance\n\n- Done.\n\n"
+        f"## Verification\n\n{commands}\n"
+    )
+    with pytest.raises(GoalInputError) as excinfo:
+        goal_spec_from_markdown(text, source="x.md", root=tmp_path)
+    assert "8" in str(excinfo.value)

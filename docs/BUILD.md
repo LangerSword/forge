@@ -726,7 +726,7 @@ evidence they regressed. What is genuinely still open, in priority order:
    boundary is the same pattern: local-first trace sinks are authoritative;
    the external mirror stays fail-loud until an ingestion contract is
    supplied — never silently fake delivery.)
-5. **Wire the scheduler into the CLI.** `forge graph` compiles a graph, but
+5. ✅ **Wire the scheduler into the CLI — DONE (2026-09-28).** Implemented as `forge run-graph <goal.json | plan.md>` with live evidence (`graph-7fd57cd4` passed; sessions forge-19 / forge-20; per-task deterministic verification). Original scope, kept for the record:  `forge graph` compiles a graph, but
    nothing runs it end-to-end from the CLI yet. Add `forge run-graph
    <goal.json>` that builds a scheduler with the selected memory backend.
 6. **Fix the publish-npm workflow** (failing since 2026-09-07) before pushing

@@ -14,6 +14,9 @@ Two documented input formats:
    - The first section whose heading contains "acceptance" supplies the
      acceptance criteria, one per bullet (``- [ ]`` checkbox markers
      stripped). Missing acceptance fails loud — never a guessed goal.
+   - The first section whose heading contains "verification" supplies
+     deterministic verifier commands, one per bullet; a backticked command
+     inside the bullet wins over its prose.
    - Labeled lines anywhere supply: ``Repo:``, ``Harness:``, ``Artifact:``,
      ``Max minutes:``, ``Max parallel:``.
    - ``Repo`` defaults to the current directory; ``Harness`` falls back to
@@ -25,6 +28,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -114,6 +118,32 @@ def _policy_harness(root: Path) -> str | None:
     return str(harness) if isinstance(harness, str) and harness.strip() else None
 
 
+def _command_from_bullet(item: str) -> list[str] | None:
+    match = re.search(r"`([^`]+)`", item)
+    text = match.group(1) if match else item
+    tokens = shlex.split(text)
+    return tokens or None
+
+
+def _verifier_commands(sections: list[tuple[str, list[str]]]) -> list[list[str]]:
+    commands: list[list[str]] = []
+    for heading, body in sections:
+        normal = heading.lower()
+        if "verification" not in normal and "verifier" not in normal:
+            continue
+        for item in _bullets(body):
+            tokens = _command_from_bullet(item)
+            if tokens is None:
+                continue
+            if len(tokens) > 32:
+                raise GoalInputError(f"verification command exceeds 32 tokens: {item[:60]!r}")
+            commands.append(tokens)
+        break
+    if len(commands) > 8:
+        raise GoalInputError(f"at most 8 verification commands are supported, got {len(commands)}")
+    return commands
+
+
 def goal_spec_from_markdown(text: str, *, source: str, root: Path) -> GoalSpec:
     body_text = _strip_front_matter(text)
     lines = body_text.splitlines()
@@ -144,6 +174,8 @@ def goal_spec_from_markdown(text: str, *, source: str, root: Path) -> GoalSpec:
             "'## Acceptance' with '- item' bullets (or use a GoalSpec JSON file)"
         )
 
+    verifier_commands = _verifier_commands(sections)
+
     repo = _labeled(lines, "repo") or str(root)
     harness = _labeled(lines, "harness") or _policy_harness(root)
     if not harness:
@@ -165,6 +197,8 @@ def goal_spec_from_markdown(text: str, *, source: str, root: Path) -> GoalSpec:
     }
     if artifact:
         kwargs["artifact_path"] = artifact
+    if verifier_commands:
+        kwargs["verifier_commands"] = verifier_commands
     return GoalSpec(**kwargs)
 
 

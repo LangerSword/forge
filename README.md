@@ -162,6 +162,9 @@ python -m forge.cli dashboard
 
 # 6. cockpit (Go TUI): build once — then bare `forge` opens it
 cd tui && go build -o ~/.local/bin/forge-tui . && forge
+
+# 7. give it something to do — compile a plan, run workers live, verify every node
+uv run forge run-graph evals/goals/quickstart-doc-v1.md    # or any .md plan / .json goal
 ```
 
 ## Product surfaces and deployment

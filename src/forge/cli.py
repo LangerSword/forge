@@ -10,6 +10,7 @@ import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from dotenv import load_dotenv
 
@@ -35,6 +36,7 @@ from .openai_provider import OpenAIProvider, ProviderError
 from .submission import run_submission_mvp
 from .ledger import Ledger
 from .review import run_review
+from .scheduler import GraphScheduler
 from .schema import GoalSpec
 
 
@@ -288,6 +290,64 @@ def cmd_review(run_id: str) -> int:
     return 0 if result["all_suites_100"] else 1
 
 
+def cmd_run_graph(goal_file: str, *, dry_run: bool = False) -> int:
+    """Compile a goal and execute its typed graph live through AO.
+
+    Specialist nodes run as bounded AO workers behind the per-task
+    deterministic verifier (``goal.verifier_commands``); the graph passes only
+    when every node passes. Planner nodes expand recursively; judge nodes
+    route when a judge is wired (the decision-engine slot).
+    """
+    try:
+        goal = load_goal_spec(Path(goal_file))
+        graph = compile_goal_graph(goal, graph_id="goal")
+    except Exception as exc:
+        print(json.dumps({"schema_version": "forge.run-graph.v1", "ok": False, "error": type(exc).__name__, "message": str(exc)[:500]}, indent=2))
+        return 1
+    counts = graph_counts(graph)
+    if dry_run:
+        print(json.dumps({
+            "schema_version": "forge.run-graph.v1", "ok": True, "dry_run": True,
+            "goal": goal.model_dump(), "graph": graph.model_dump(), "counts": counts,
+        }, indent=2, sort_keys=True, default=str))
+        return 0
+    if not goal.verifier_commands:
+        print(json.dumps({
+            "schema_version": "forge.run-graph.v1", "ok": False, "error": "missing_verifier",
+            "message": "goal has no verifier_commands; deterministic verification is required for a live run (add a '## Verification' section with one command per bullet, or set verifier_commands in JSON)",
+        }, indent=2))
+        return 1
+    try:
+        require_ao_ready()
+    except AOCommandError as exc:
+        print(json.dumps({"schema_version": "forge.run-graph.v1", "ok": False, "error": "ao_not_ready", "message": str(exc)}, indent=2))
+        return 1
+    run_id = f"graph-{uuid4().hex[:8]}"
+    scheduler = GraphScheduler(root(), runner_factory=ao_runner_factory(root()))
+    try:
+        result = scheduler.run(graph, graph_id=run_id, goal=goal)
+    except Exception as exc:
+        print(json.dumps({"schema_version": "forge.run-graph.v1", "ok": False, "error": type(exc).__name__, "message": str(exc)[:500]}, indent=2))
+        return 1
+    print(json.dumps({
+        "schema_version": "forge.run-graph.v1",
+        "ok": result.status == "passed",
+        "run_id": run_id,
+        "status": result.status,
+        "counts": counts,
+        "node_results": [
+            {
+                "node_id": node.node_id,
+                "status": node.status,
+                "evidence_refs": list(node.evidence_refs),
+                "observations": list(node.observations),
+            }
+            for node in result.node_results
+        ],
+    }, indent=2, sort_keys=True, default=str))
+    return 0 if result.status == "passed" else 1
+
+
 def ao_runner_factory(run_root: Path):
     """One construction point for the AO-backed runner every live command uses."""
 
@@ -383,6 +443,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("experiments", help="list completed experiments")
     graph_cmd = sub.add_parser("graph", help="compile a goal into its typed execution graph")
     graph_cmd.add_argument("goal_file", help="path to GoalSpec JSON file")
+    run_graph = sub.add_parser("run-graph", help="compile a goal and execute its typed graph live through AO")
+    run_graph.add_argument("goal_file", help="path to a GoalSpec JSON or a .md plan")
+    run_graph.add_argument("--dry-run", action="store_true", help="compile and print the graph without spawning")
     review_cmd = sub.add_parser("review", help="grade Forge's own verdict systems against deterministic oracles")
     review_cmd.add_argument("--run-id", default="review-suite")
     ao_cmd = sub.add_parser("ao", help="manage the Agent Orchestrator daemon and its CLI")
@@ -472,6 +535,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_experiments()
     if args.command == "graph":
         return cmd_graph(args.goal_file)
+    if args.command == "run-graph":
+        return cmd_run_graph(args.goal_file, dry_run=args.dry_run)
     if args.command == "review":
         return cmd_review(args.run_id)
     return 2
