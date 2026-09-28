@@ -51,6 +51,7 @@ class AORunRequest:
     model: str | None = None
     artifact_path: Path | None = None
     worktree: Path | None = None
+    repo: Path | None = None
     existing_session_id: str | None = None
     independent_verifier: IndependentVerifier | None = None
     max_polls: int = 30
@@ -432,7 +433,7 @@ class AORunner:
             if worktree is None:
                 discover = getattr(self.ao_cli, "discover_worktree", None)
                 if discover is not None:
-                    worktree = discover(session_id)
+                    worktree = discover(session_id, cwd=request.repo)
                     self._record(
                         events,
                         request,

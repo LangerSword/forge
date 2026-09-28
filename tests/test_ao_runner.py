@@ -474,3 +474,57 @@ def test_runner_without_policy_still_runs():
     runner = AORunner(ao_cli=cli, ao_client=client)
     result = runner.run(_policy_test_request())
     assert result.status in {"passed", "blocked", "failed"}
+
+
+class DiscoverCLI(FakeCLI):
+    """Fake whose spawn reports no worktree; records the discovery cwd."""
+
+    def __init__(self, worktree: Path):
+        super().__init__(worktree)
+        self.discover_calls: list[tuple[str, Path | None]] = []
+
+    def spawn(self, *, project: str, name: str, prompt: str, harness: str, mode: str, model: str | None = None):
+        self.spawn_calls.append({"project": project, "name": name, "prompt": prompt, "harness": harness, "mode": mode, "model": model})
+        return AOCommandResult(("ao", "spawn"), 0, json.dumps({"session_id": "session-1"}), "")
+
+    def discover_worktree(self, session_id: str, *, cwd: Path | None = None):
+        self.discover_calls.append((session_id, cwd))
+        return self.worktree
+
+
+def test_runner_discovers_worktree_in_the_goal_repo(tmp_path: Path):
+    goal_repo = tmp_path / "goal-repo"
+    goal_repo.mkdir()
+    artifact = goal_repo / "result.json"
+    cli = DiscoverCLI(goal_repo)
+    client = FakeClient(
+        [
+            {"id": "session-1", "status": "working", "elapsed_s": 1, "last_activity_s": 0},
+            {"id": "session-1", "status": "completed", "elapsed_s": 2, "last_activity_s": 0},
+        ],
+        artifact,
+    )
+    result = AORunner(
+        ao_cli=cli,
+        ao_client=client,
+        sleep_fn=lambda _: None,
+        changed_files_probe=lambda _: ("result.json",),
+        independent_verifier=lambda worktree, path: path.exists(),
+    ).run(
+        AORunRequest(
+            run_id="runner-goal-repo",
+            goal="make an artifact in another repo",
+            project="todo",
+            worker_name="worker-goal-repo",
+            prompt="Create the artifact.",
+            artifact_path=Path("result.json"),
+            repo=goal_repo,
+            max_polls=3,
+        )
+    )
+    assert result.status == "passed"
+    assert cli.discover_calls == [("session-1", goal_repo)]
+    discovered = [event for event in result.events if event.kind == "worktree_discovered"]
+    assert discovered, "expected a worktree_discovered event"
+    payload = getattr(discovered[0], "payload", None) or {}
+    assert str(payload.get("worktree")) == str(goal_repo)

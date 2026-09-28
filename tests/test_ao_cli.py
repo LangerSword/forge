@@ -168,3 +168,32 @@ def test_resolve_binary_error_is_actionable_when_nothing_found(monkeypatch, tmp_
         assert "AO_CLI_BINARY" in str(exc)
     else:
         raise AssertionError("expected AOCommandError")
+
+
+def test_discover_worktree_searches_the_goal_repo_when_given(monkeypatch, tmp_path):
+    forge_root = tmp_path / "forge-root"
+    goal_repo = tmp_path / "goal-repo"
+    forge_root.mkdir()
+    goal_repo.mkdir()
+    cli = AOCLI(binary="/usr/bin/ao", cwd=forge_root)
+    porcelain = (
+        f"worktree {goal_repo / 'sess-1'}\n"
+        "HEAD abc123\n"
+        "branch refs/heads/ao/sess-1/root\n"
+    )
+    captured: dict = {}
+
+    class Result:
+        returncode = 0
+        stdout = porcelain
+        stderr = ""
+
+    def fake_run(args, **kwargs):
+        captured["args"] = list(args)
+        return Result()
+
+    monkeypatch.setattr("forge.ao_cli.subprocess.run", fake_run)
+    assert cli.discover_worktree("sess-1", cwd=goal_repo) == goal_repo / "sess-1"
+    args = captured["args"]
+    assert "-C" in args
+    assert args[args.index("-C") + 1] == str(goal_repo)

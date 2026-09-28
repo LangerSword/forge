@@ -160,9 +160,13 @@ class AOCLI:
     def status(self) -> AOCommandResult:
         return self.run(("status",))
 
-    def discover_worktree(self, session_id: str) -> Path | None:
-        """Resolve the observed AO Git worktree branch for a session."""
-        root = self.cwd or Path.cwd()
+    def discover_worktree(self, session_id: str, *, cwd: Path | None = None) -> Path | None:
+        """Resolve the observed AO Git worktree branch for a session.
+
+        ``cwd`` overrides which repository's worktree list is searched — the
+        goal's repo when it differs from Forge's own checkout.
+        """
+        root = cwd or self.cwd or Path.cwd()
         try:
             proc = subprocess.run(
                 ("git", "-C", str(root), "worktree", "list", "--porcelain"),

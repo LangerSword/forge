@@ -358,6 +358,7 @@ class FleetController:
                     mode=task.mode,
                     condition="C0",
                     artifact_path=Path(task.artifact_path) if task.artifact_path else None,
+                    repo=Path(goal.repo),
                     max_polls=max(1, int(goal.max_minutes * 60)),
                     max_runtime_s=goal.max_minutes * 60,
                     independent_verifier=self.verifier_factory(goal, task),
