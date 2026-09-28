@@ -27,6 +27,7 @@ from .ao_runner import AORunner
 from .c0_run import run_c0
 from .experiment import LearningExperiment, TaskExecutor
 from .fleet import FleetController, build_bounded_goal_graph
+from .goal_input import load_goal_spec
 from .graph import compile_goal_graph, graph_counts
 from .harness_readiness import build_harness_report
 from .openai_provider import OpenAIProvider, ProviderError
@@ -167,7 +168,7 @@ def cmd_experiment(experiment_id: str, goal_file: str, *, model_baseline: str | 
     is recorded to the ledger and reported.
     """
     try:
-        goal = GoalSpec.model_validate_json(Path(goal_file).read_text())
+        goal = load_goal_spec(Path(goal_file))
     except Exception as exc:
         print(json.dumps({"schema_version": "forge.experiment.v1", "ok": False,
                           "error": "invalid_goal", "message": str(exc)}, indent=2))
@@ -237,7 +238,7 @@ def cmd_experiments() -> int:
 def cmd_graph(goal_file: str) -> int:
     """Compile a goal JSON into its typed execution graph and print it."""
     try:
-        goal = GoalSpec.model_validate_json(Path(goal_file).read_text())
+        goal = load_goal_spec(Path(goal_file))
         graph = compile_goal_graph(goal)
     except Exception as exc:
         print(json.dumps({
@@ -366,7 +367,7 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_ao(args)
     if args.command in {"plan", "fleet"}:
         try:
-            goal = GoalSpec.model_validate_json(Path(args.goal_file).read_text())
+            goal = load_goal_spec(Path(args.goal_file))
             graph = build_bounded_goal_graph(goal)
             if args.command == "plan":
                 print(json.dumps({"schema_version": "forge.task-graph.v1", "ok": True, "goal": goal.model_dump(), "graph": graph.model_dump()}, indent=2, sort_keys=True))
