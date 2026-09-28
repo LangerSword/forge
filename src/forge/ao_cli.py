@@ -113,17 +113,22 @@ class AOCLI:
     cwd: Path | None = None
 
     def resolve_binary(self) -> str:
+        """Resolve the `ao` CLI: env override, explicit pin, live daemon
+        binary, then the stable copy installed by `forge ao install-cli`."""
         # Env override wins: AO_CLI_BINARY beats discovery.
         env_binary = os.getenv("AO_CLI_BINARY")
         if env_binary:
             return env_binary
         if self.binary:
             return self.binary
-        # Discover the live daemon binary via /proc, NOT gated on any
-        # hardcoded AppImage path. Regression: this scan used to be nested
-        # inside `if candidate.exists()` for a ~/.local/bin AppImage, so a
-        # machine where AO lives elsewhere resolved nothing even with the
-        # daemon running (observed 2026-09-15).
+        # 1) The live daemon binary via /proc — always version-matched to the
+        # running daemon. NOT gated on any hardcoded AppImage path. Regression:
+        # the scan used to be nested inside `if candidate.exists()` for a
+        # ~/.local/bin AppImage that does not exist on this machine, so nothing
+        # resolved even with the daemon running (observed 2026-09-15); the same
+        # dead path later broke resolution whenever the daemon was down
+        # (observed 2026-09-28 — the AppImage lives in ~/Applications with a
+        # hash suffix now).
         for proc in Path("/proc").glob("[0-9]*"):
             try:
                 target = Path(os.readlink(proc / "exe"))
@@ -131,10 +136,15 @@ class AOCLI:
                 continue
             if target.name == "ao" and "resources/daemon" in str(target):
                 return str(target)
-        candidate = Path("/home/lakshaya/.local/bin/agent-orchestrator-linux-x64.AppImage")
-        if candidate.exists():
-            return str(candidate)
-        raise AOCommandError("AO CLI binary not resolved; run AO or set AO_CLI_BINARY")
+        # 2) The stable CLI copy installed by `forge ao install-cli`. This is
+        # what makes `ao status/start/stop` work while the daemon is down.
+        stable = Path.home() / ".local" / "bin" / "ao"
+        if stable.is_file() and os.access(stable, os.X_OK):
+            return str(stable)
+        raise AOCommandError(
+            "AO CLI binary not resolved: no live daemon binary and no stable "
+            f"copy at {stable}. Run `forge ao install-cli` or set AO_CLI_BINARY."
+        )
 
     def run(self, args: tuple[str, ...], *, timeout: int = 30) -> AOCommandResult:
         command = (self.resolve_binary(), *args)

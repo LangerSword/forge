@@ -138,3 +138,33 @@ def test_resolve_binary_env_override_wins(monkeypatch):
     monkeypatch.setenv("AO_CLI_BINARY", "/opt/ao/bin/ao")
     cli = AOCLI()
     assert cli.resolve_binary() == "/opt/ao/bin/ao"
+
+
+def test_resolve_binary_falls_back_to_stable_cli_copy(monkeypatch, tmp_path):
+    """No live daemon: the stable copy at ~/.local/bin/ao (installed once by
+    `forge ao install-cli`) is the next resolution path."""
+    import forge.ao_cli as ao_cli_mod
+
+    monkeypatch.setattr(ao_cli_mod.Path, "glob", lambda self, pattern: iter([]))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    stable = tmp_path / ".local" / "bin" / "ao"
+    stable.parent.mkdir(parents=True)
+    stable.write_text("#!/bin/sh\necho ao\n")
+    stable.chmod(0o755)
+    assert AOCLI().resolve_binary() == str(stable)
+
+
+def test_resolve_binary_error_is_actionable_when_nothing_found(monkeypatch, tmp_path):
+    """Neither a live daemon nor a stable copy: fail loud with the fix."""
+    import forge.ao_cli as ao_cli_mod
+
+    monkeypatch.setattr(ao_cli_mod.Path, "glob", lambda self, pattern: iter([]))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("AO_CLI_BINARY", raising=False)
+    try:
+        AOCLI().resolve_binary()
+    except ao_cli_mod.AOCommandError as exc:
+        assert "install-cli" in str(exc)
+        assert "AO_CLI_BINARY" in str(exc)
+    else:
+        raise AssertionError("expected AOCommandError")
