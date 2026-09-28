@@ -21,7 +21,7 @@ logging.getLogger("neatlogs").setLevel(logging.WARNING)
 
 from . import __version__
 from .ao import AOClient
-from .ao_cli import AOCLI
+from .ao_cli import AOCLI, AOCommandError, install_cli
 from .c0_run import run_c0
 from .experiment import LearningExperiment, TaskExecutor
 from .fleet import FleetController, build_bounded_goal_graph
@@ -284,6 +284,20 @@ def cmd_review(run_id: str) -> int:
     return 0 if result["all_suites_100"] else 1
 
 
+def cmd_ao(args: argparse.Namespace) -> int:
+    """Agent Orchestrator CLI commands (lifecycle commands land in task 3/5)."""
+    if args.ao_command == "install-cli":
+        try:
+            result = install_cli(force=args.force)
+        except AOCommandError as exc:
+            print(json.dumps({"schema_version": "forge.ao.v1", "ok": False, "error": "install_failed", "message": str(exc)}, indent=2))
+            return 1
+        print(json.dumps({"schema_version": "forge.ao.v1", "ok": True, **result}, indent=2, sort_keys=True))
+        return 0
+    print(json.dumps({"schema_version": "forge.ao.v1", "ok": False, "error": "unknown_ao_command"}, indent=2))
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="forge")
     parser.add_argument("--version", action="version", version=__version__)
@@ -314,6 +328,10 @@ def main(argv: list[str] | None = None) -> int:
     graph_cmd.add_argument("goal_file", help="path to GoalSpec JSON file")
     review_cmd = sub.add_parser("review", help="grade Forge's own verdict systems against deterministic oracles")
     review_cmd.add_argument("--run-id", default="review-suite")
+    ao_cmd = sub.add_parser("ao", help="manage the Agent Orchestrator daemon and its CLI")
+    ao_sub = ao_cmd.add_subparsers(dest="ao_command", required=True)
+    ao_install = ao_sub.add_parser("install-cli", help="extract the ao CLI from the Agent Orchestrator AppImage to ~/.local/bin/ao")
+    ao_install.add_argument("--force", action="store_true")
     dash = sub.add_parser("dashboard")
     dash.add_argument("--port", type=int, default=8787)
     args = parser.parse_args(argv)
@@ -321,6 +339,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_status()
     if args.command == "harnesses":
         return cmd_harnesses()
+    if args.command == "ao":
+        return cmd_ao(args)
     if args.command in {"plan", "fleet"}:
         try:
             goal = GoalSpec.model_validate_json(Path(args.goal_file).read_text())

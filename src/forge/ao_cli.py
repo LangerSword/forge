@@ -6,10 +6,13 @@ constructed for explicit execution by the controller and recorded first.
 """
 from __future__ import annotations
 
-import os
+import hashlib
 import json
+import os
 import re
+import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -138,7 +141,7 @@ class AOCLI:
                 return str(target)
         # 2) The stable CLI copy installed by `forge ao install-cli`. This is
         # what makes `ao status/start/stop` work while the daemon is down.
-        stable = Path.home() / ".local" / "bin" / "ao"
+        stable = stable_cli_path()
         if stable.is_file() and os.access(stable, os.X_OK):
             return str(stable)
         raise AOCommandError(
@@ -218,3 +221,98 @@ class AOCLI:
     @neatlogs.span(kind="TOOL")
     def kill(self, session_id: str) -> AOCommandResult:
         return self.run(("session", "kill", session_id))
+
+
+def stable_cli_path() -> Path:
+    """The stable `ao` CLI copy installed by ``forge ao install-cli``."""
+    return Path.home() / ".local" / "bin" / "ao"
+
+
+def find_appimage() -> Path | None:
+    """Locate the Agent Orchestrator AppImage.
+
+    AppImageLauncher-managed installs live in ~/Applications (hash-suffixed);
+    the desktop entry's ~/.local/bin path can be stale on this machine
+    (observed 2026-09-28).
+    """
+    for rel in ("Applications", ".local/bin", "Downloads"):
+        hits = sorted(
+            path for path in (Path.home() / rel).glob("*agent-orchestrator*.AppImage") if path.is_file()
+        )
+        if hits:
+            return hits[0]
+    return None
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _app_version() -> str | None:
+    try:
+        payload = json.loads((Path.home() / ".ao" / "app-state.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    version = payload.get("version")
+    return str(version) if version else None
+
+
+def _extract_ao_from_appimage(appimage: Path, workdir: Path) -> Path:
+    """Extract only resources/daemon from the AppImage into ``workdir``."""
+    proc = subprocess.run(
+        (str(appimage), "--appimage-extract", "resources/daemon*"),
+        cwd=workdir,
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    extracted = workdir / "squashfs-root" / "resources" / "daemon" / "ao"
+    if proc.returncode != 0 or not extracted.is_file():
+        raise AOCommandError(f"AppImage extraction failed ({proc.returncode}): {proc.stderr[-300:]}")
+    return extracted
+
+
+def install_cli(*, dest: Path | None = None, appimage: Path | None = None, force: bool = False, extractor=None) -> dict[str, Any]:
+    """Install the `ao` CLI at a stable path.
+
+    Why: the CLI only exists inside the running AppImage mount; with the
+    daemon down nothing resolves (the old hardcoded ~/.local/bin AppImage
+    path does not exist on this machine). `ao doctor` also wants `ao` in
+    PATH for workspace hooks.
+    """
+    dest = dest or stable_cli_path()
+    source = appimage or find_appimage()
+    if source is None:
+        raise AOCommandError(
+            "Agent Orchestrator AppImage not found under ~/Applications, "
+            "~/.local/bin, ~/Downloads; install the app or pass appimage"
+        )
+    extract = extractor or _extract_ao_from_appimage
+    with tempfile.TemporaryDirectory(prefix="forge-ao-extract-") as tmp:
+        extracted = Path(extract(source, Path(tmp)))
+        if not extracted.is_file():
+            raise AOCommandError(f"extractor produced no ao binary at {extracted}")
+        digest = _sha256(extracted)
+        if dest.is_file() and _sha256(dest) == digest and not force:
+            return {
+                "status": "up_to_date",
+                "path": str(dest),
+                "sha256": digest,
+                "source": str(source),
+                "app_version": _app_version(),
+            }
+        status = "updated" if dest.is_file() else "installed"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(extracted, dest)
+        dest.chmod(0o755)
+    return {
+        "status": status,
+        "path": str(dest),
+        "sha256": digest,
+        "source": str(source),
+        "app_version": _app_version(),
+    }
